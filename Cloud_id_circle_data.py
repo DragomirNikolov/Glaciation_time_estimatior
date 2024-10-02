@@ -166,12 +166,6 @@ for var_name, var in cph_data.variables.items():
         new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})  # Copy variable attributes
         new_var[:] =  var[:]  #could also be : ... =var[i] if 'time' in var.dimensions else  var[:]
                                 # For time-dependent variables, use the ith timestep
-# new_var=new_dataset.createVariable('nfeatures', 'i2')
-# new_var.assignValue(2)
-
-# npix_feature=new_dataset.createVariable('npix_feature', 'u8', ('object_num'))
-# npix_feature[0]=np.count_nonzero( feature_varname[1,:,:] == 1)
-# npix_feature[1]=np.count_nonzero( feature_varname[1,:,:] == 2)
 
 # Close the new file
 new_dataset.close()
