@@ -91,8 +91,8 @@ new_file_name = f"/wolke_scratch/dnikolo/TEST/example_preprocessing/CTT-38-0-{da
 new_dataset = nc.Dataset(new_file_name, 'w', format='NETCDF4')
 
 new_dataset.set_fill_off()
-new_dataset.createDimension("x", len(x))
-new_dataset.createDimension("y", len(y_limited_ind))
+new_dataset.createDimension("lon", len(x))
+new_dataset.createDimension("lat", len(y_limited_ind))
 new_dataset.createDimension('time', len(time_ind_cph))
 new_dataset.createDimension('object_num',2)
 # Copy variables from the original file, except the time variable
@@ -103,13 +103,15 @@ for var_name, var in cph_data.variables.items():
         new_time.calendar = calendar
         new_time[:] = nc.date2num(dates[time_ind_cph], units=time_units, calendar=calendar)
     elif var_name=="x":
-        new_var = new_dataset.createVariable(var_name, var.dtype, ('x'))
-        new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})  # Copy variable attributes
-        new_var[:] = x*10*180/np.pi  # For time-dependent variables, use the ith timestep
+            new_var = new_dataset.createVariable('longitude', var.dtype, ('lat','lon'))
+            new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})  # Copy variable attributes
+            new_var.long_name="longitude"
+            new_var[:] =  lon_mat  # For time-dependent variables, use the ith timestep
     elif var_name=="y":
-        new_var = new_dataset.createVariable(var_name, var.dtype, ('y'))
-        new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})  # Copy variable attributes
-        new_var[:] = y[y_limited_ind_bug]*10*180/np.pi  # For time-dependent variables, use the ith timestep
+            new_var = new_dataset.createVariable('latitude', var.dtype, ('lat','lon'))
+            new_var.long_name="latitude"
+            new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})  # Copy variable attributes
+            new_var[:] = lat_mat  # For time-dependent variables, use the ith timestep
     
     elif var_name=="cph":
         new_var = new_dataset.createVariable(var_name, var.dtype, var.dimensions)
