@@ -2,13 +2,13 @@ import numpy as np
 import netCDF4 as nc
 import matplotlib.pyplot as plt
 import time
-from Helper_fun import time_intersection,generate_temp_range
+from Helper_fun import time_intersection, generate_temp_range
 # ==================================================
 # Create a merged file that includes the cph field
 # ==================================================
 
 
-def output_file_generation(comb_mask,y_limited_ind_bug, dates, min_temp, max_temp):
+def output_file_generation(comb_mask, y_limited_ind_bug, dates, min_temp, max_temp):
     date = dates[0]
     new_file_name = f"/wolke_scratch/dnikolo/TEST/example_preprocessing/CTT-it-{round(abs(min_temp))}-{round(abs(max_temp))}-{date.day:02d}-{date.month:02d}-{date.year}_{date.hour:02d}:{date.minute:02d}:{date.second:02d}.nc"
 
@@ -29,20 +29,27 @@ def output_file_generation(comb_mask,y_limited_ind_bug, dates, min_temp, max_tem
             new_time[:] = nc.date2num(
                 dates[time_ind_cph], units=time_units, calendar=calendar)
 
-        elif var_name=="x":
+        elif var_name == "x":
             new_var = new_dataset.createVariable('lon', var.dtype, ('lon',))
-            new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})  # Copy variable attributes
-            new_var.long_name="longitude"
-            new_var[:] =  x*10*180/np.pi  # For time-dependent variables, use the ith timestep
-        elif var_name=="y":
+            # Copy variable attributes
+            new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
+            new_var.long_name = "longitude"
+            # For time-dependent variables, use the ith timestep
+            new_var[:] = x*10*180/np.pi
+        elif var_name == "y":
             new_var = new_dataset.createVariable('lat', var.dtype, ('lat',))
-            new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})  # Copy variable attributes
-            new_var.long_name="latitude"
-            new_var[:] = y[y_limited_ind_bug]*10*180/np.pi  # For time-dependent variables, use the ith timestep
-        elif var_name=="cph":
-            new_var = new_dataset.createVariable(var_name, var.dtype, ('time','lat','lon'))
-            new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})  # Copy variable attributes
-            new_var[:] = ~(comb_mask) # For time-dependent variables, use the ith timestep
+            # Copy variable attributes
+            new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
+            new_var.long_name = "latitude"
+            # For time-dependent variables, use the ith timestep
+            new_var[:] = y[y_limited_ind_bug]*10*180/np.pi
+        elif var_name == "cph":
+            new_var = new_dataset.createVariable(
+                var_name, var.dtype, ('time', 'lat', 'lon'))
+            # Copy variable attributes
+            new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
+            # For time-dependent variables, use the ith timestep
+            new_var[:] = ~(comb_mask)
 
         elif var_name == "cph":
             new_var = new_dataset.createVariable(
@@ -149,10 +156,10 @@ print("Loading copies of data")
 ctt = tmp_data['ctt'][time_ind_ctt, y_limited_ind, :]
 cph = cph_data['cph'][time_ind_cph, y_limited_ind, :]
 
-t_deltas=[12,19]
-temp_bounds=generate_temp_range(t_deltas)
+t_deltas = [12, 19]
+temp_bounds = generate_temp_range(t_deltas)
 
-for min_temp,max_temp in temp_bounds:
+for min_temp, max_temp in temp_bounds:
     filter_mask = filter_data(ctt, cph, min_temp, max_temp)
     print(f"Generating new merged file: T={min_temp}:{max_temp}")
     output_file_generation(

@@ -1,9 +1,10 @@
 ---
-# ERA5 Z500 anomaly tracking configuration file
+# Arctic mixed phase stratus tracking configuration file
 #STILL NOT SET UP
 # 0 - Warnings , 1 - Info , 2 - Debug
 debug_mode: 1
-logger_filepath: '/wolke_scratch/dnikolo/TEST/Debug/Logging/Log_standard.log'
+logger_filepath: '/cluster/work/climate/dnikolo/n2o/Glaciation_time_estimatior/Debug/Logging/Log_standard.log'
+error_filepath: '/cluster/work/climate/dnikolo/n2o/Glaciation_time_estimatior/Debug/Errors/Error_standard.log'
 
 # Identify features to track
 run_idfeature: True
@@ -26,7 +27,7 @@ enddate:   '20040201.2000'
 
 # Parallel processing set up
 # run_parallel: 1 (local cluster), 2 (Dask MPI)
-run_parallel: 2
+run_parallel: 1
 nprocesses: 16  # Number of processors to use if run_parallel=1
 
 databasename: 'CTT-it-25-20-'
@@ -35,9 +36,9 @@ databasename: 'CTT-it-25-20-'
 # E.g., wrfout_2018-11-01_01:15:00 --> yyyy-mo-dd_hh:mm:ss
 time_format: 'dd-mo-yyyy_hh:mm:ss'
 # Input files directory
-clouddata_path: '/wolke_scratch/dnikolo/TEST/example_preprocessing/'
+clouddata_path: '/cluster/work/climate/dnikolo/n2o/TEST/example_preprocessing/'
 # Working directory for the tracking data
-root_path: '/wolke_scratch/dnikolo/TEST/example_postprocessing'
+root_path: '/cluster/work/climate/dnikolo/n2o/TEST/example_postprocessing'
 # Working sub-directory names
 tracking_path_name: 'tracking'
 stats_path_name: 'stats'
@@ -70,7 +71,7 @@ timegap: 0.3          # hour
 othresh: 0.3           # overlap percentage threshold
 
 ####??? How can there be 3 clouds in an image with 2 circles??? The code bugs if we set it to 2
-maxnclouds: 250       # Maximum number of features in one snapshot 
+maxnclouds: 300       # Maximum number of features in one snapshot 
 
 nmaxlinks: 30          # Maximum number of overlaps that any single feature can be linked to
 duration_range: [4, 30]   # A vector [minlength,maxlength] to specify the duration range for the tracks
