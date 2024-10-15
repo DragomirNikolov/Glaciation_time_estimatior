@@ -83,8 +83,7 @@ def filter_data(ctt, cph, min_temp, max_temp):
     ctt = np.ma.masked_where((ctt < 273.15 + min_temp)
                              | (ctt > 273.15 + max_temp), ctt)
     # Create a combined mask that only has entries at positions within temp range and valid phase
-    comb_mask = ctt.mask | cph.mask
-    cph.mask=comb_mask
+    cph.mask = ctt.mask | cph.mask
     return cph
 
 
