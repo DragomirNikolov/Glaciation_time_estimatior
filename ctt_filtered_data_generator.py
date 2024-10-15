@@ -1,6 +1,6 @@
 import numpy as np
 import netCDF4 as nc
-import matplotlib.pyplot as plt
+import os
 import time
 from Helper_fun import time_intersection
 
@@ -10,10 +10,10 @@ start_time = time.time()
 # ==================================================
 # Open and load cloud top temp and cloud top phase data
 # ==================================================
-
+PyFLEXTRKR_LIB_DIR=os.environ['PyFLEXTRKR_LIB_DIR']
 print("Loading data")
-cph_fp = '/wolke_scratch/dnikolo/TEST/cph.CPP.nc.nc'
-tmp_fp = '/wolke_scratch/dnikolo/TEST/ctt.nc.nc'
+cph_fp = PyFLEXTRKR_LIB_DIR+'/TEST/cph.CPP.nc.nc'
+tmp_fp = PyFLEXTRKR_LIB_DIR+'/TEST/ctt.nc.nc'
 cph_data = nc.Dataset(cph_fp)  # cloud_phase_file
 tmp_data = nc.Dataset(tmp_fp)  # cloud_phase_file
 print(f"Data loaded. Elapsed time: {time.time()-start_time}")
@@ -87,7 +87,7 @@ cph.mask = comb_mask
 # ==================================================
 print(f"Generating new merged file")
 date = dates[0]
-new_file_name = f"/wolke_scratch/dnikolo/TEST/example_preprocessing/CTT-38-0-{date.day:02d}-{date.month:02d}-{date.year}_{date.hour:02d}:{date.minute:02d}:{date.second:02d}.nc"
+new_file_name = PyFLEXTRKR_LIB_DIR+f"/TEST/example_preprocessing/CTT-38-0-{date.day:02d}-{date.month:02d}-{date.year}_{date.hour:02d}:{date.minute:02d}:{date.second:02d}.nc"
 
 # Create a new NetCDF file
 new_dataset = nc.Dataset(new_file_name, 'w', format='NETCDF4')
@@ -128,7 +128,7 @@ for var_name, var in cph_data.variables.items():
         new_var.setncatts({k: var.getncattr(k)
                           for k in var.ncattrs()})  # Copy variable attributes
         # For time-dependent variables, use the ith timestep -(cloud_mask.mask[count,:,:]-1)*50
-        new_var[:] = ~(cph.mask[time_ind_cph, :, :])
+        new_var[:] = cph[time_ind_cph, :, :]
 
         # new_var = new_dataset.createVariable("feature_varname", var.dtype, var.dimensions)
         # new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})  # Copy variable attributes

@@ -1,16 +1,17 @@
 import numpy as np
 import netCDF4 as nc
-import matplotlib.pyplot as plt
 import time
 from Helper_fun import time_intersection, generate_temp_range
+import os
 # ==================================================
 # Create a merged file that includes the cph field
 # ==================================================
 
+PyFLEXTRKR_LIB_DIR=os.environ['PyFLEXTRKR_LIB_DIR']
 
-def output_file_generation(comb_mask, y_limited_ind_bug, dates, min_temp, max_temp):
+def output_file_generation(cph, y_limited_ind_bug, dates, min_temp, max_temp):
     date = dates[0]
-    new_file_name = f"/wolke_scratch/dnikolo/TEST/example_preprocessing/CTT-it-{round(abs(min_temp))}-{round(abs(max_temp))}-{date.day:02d}-{date.month:02d}-{date.year}_{date.hour:02d}:{date.minute:02d}:{date.second:02d}.nc"
+    new_file_name = PyFLEXTRKR_LIB_DIR+f"/TEST/example_preprocessing/CTT-it-{round(abs(min_temp))}-{round(abs(max_temp))}-{date.day:02d}-{date.month:02d}-{date.year}_{date.hour:02d}:{date.minute:02d}:{date.second:02d}.nc"
 
     # Create a new NetCDF file
     new_dataset = nc.Dataset(new_file_name, 'w', format='NETCDF4')
@@ -49,16 +50,16 @@ def output_file_generation(comb_mask, y_limited_ind_bug, dates, min_temp, max_te
             # Copy variable attributes
             new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
             # For time-dependent variables, use the ith timestep
-            new_var[:] = ~(comb_mask)
+            new_var[:] = cph.filled(fill_value=0)
 
-        elif var_name == "cph":
-            new_var = new_dataset.createVariable(
-                var_name, var.dtype, var.dimensions)
-            # Copy variable attributes
-            new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
-            new_var.coordinates = "x y"
-            # For time-dependent variables, use the ith timestep -(cloud_mask.mask[count,:,:]-1)*50
-            new_var[:] = ~(comb_mask)
+        # elif var_name == "cph":
+        #     new_var = new_dataset.createVariable(
+        #         var_name, var.dtype, var.dimensions)
+        #     # Copy variable attributes
+        #     new_var.setncatts({k: var.getncattr(k) for k in var.ncattrs()})
+        #     new_var.coordinates = "x y"
+        #     # For time-dependent variables, use the ith timestep -(cloud_mask.mask[count,:,:]-1)*50
+        #     new_var[:] = ~(comb_mask)
 
         else:
             new_var = new_dataset.createVariable(
@@ -83,7 +84,8 @@ def filter_data(ctt, cph, min_temp, max_temp):
                              | (ctt > 273.15 + max_temp), ctt)
     # Create a combined mask that only has entries at positions within temp range and valid phase
     comb_mask = ctt.mask | cph.mask
-    return comb_mask
+    cph.mask=comb_mask
+    return cph
 
 
 # Set up timer
@@ -94,8 +96,8 @@ start_time = time.time()
 # ==================================================
 
 print("Loading data")
-cph_fp = '/wolke_scratch/dnikolo/TEST/cph.CPP.nc.nc'
-tmp_fp = '/wolke_scratch/dnikolo/TEST/ctt.nc.nc'
+cph_fp = PyFLEXTRKR_LIB_DIR+f'/TEST/cph.CPP.nc.nc'
+tmp_fp = PyFLEXTRKR_LIB_DIR+f'/TEST/ctt.nc.nc'
 cph_data = nc.Dataset(cph_fp)  # cloud_phase_file
 tmp_data = nc.Dataset(tmp_fp)  # cloud_phase_file
 print(f"Data loaded. Elapsed time: {time.time()-start_time}")
@@ -156,14 +158,17 @@ print("Loading copies of data")
 ctt = tmp_data['ctt'][time_ind_ctt, y_limited_ind, :]
 cph = cph_data['cph'][time_ind_cph, y_limited_ind, :]
 
-t_deltas = [12, 19]
+t_deltas = [2,5,10,15,38]
 temp_bounds = generate_temp_range(t_deltas)
+print(temp_bounds)
 
-for min_temp, max_temp in temp_bounds:
-    filter_mask = filter_data(ctt, cph, min_temp, max_temp)
+for i in range(temp_bounds[0].shape[0]):
+    min_temp=temp_bounds[0][i]
+    max_temp=temp_bounds[1][i]
+    cph = filter_data(ctt, cph, min_temp, max_temp)
     print(f"Generating new merged file: T={min_temp}:{max_temp}")
     output_file_generation(
-        filter_mask, y_limited_ind_bug, dates, min_temp, max_temp)
+        cph, y_limited_ind_bug, dates, min_temp, max_temp)
     print(
         f"New merged file generated and saved. Elapsed time {time.time()-start_time}")
 
