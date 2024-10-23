@@ -27,7 +27,7 @@ enddate:   '20040201.2000'
 
 # Parallel processing set up
 # run_parallel: 1 (local cluster), 2 (Dask MPI)
-run_parallel: 1
+run_parallel: 0
 nprocesses: 16  # Number of processors to use if run_parallel=1
 
 databasename: 'CTT-it-25-20-'
@@ -88,7 +88,7 @@ match_pixel_dt_thresh: 10.0  # seconds ???
 
 # Link merge/split parameters to main tracks
 maintrack_area_thresh: 100  # [km^2] Main track area threshold
-maintrack_lifetime_thresh: 2.5  # [hour] Main track duration threshold
+maintrack_lifetime_thresh: 1.0  # [hour] Main track duration threshold
 
 ####??? ONE BUG MAY HAVE TO DO WITH THOSE. Doesn't work at split and merge 0.75
 split_duration: 1  # [hour] Split tracks <= this length is linked to the main tracks
