@@ -71,7 +71,7 @@ timegap: 0.3          # hour
 othresh: 0.3           # overlap percentage threshold
 
 ####??? How can there be 3 clouds in an image with 2 circles??? The code bugs if we set it to 2
-maxnclouds: 300       # Maximum number of features in one snapshot 
+maxnclouds: 900       # Maximum number of features in one snapshot 
 
 nmaxlinks: 30          # Maximum number of overlaps that any single feature can be linked to
 duration_range: [4, 30]   # A vector [minlength,maxlength] to specify the duration range for the tracks
