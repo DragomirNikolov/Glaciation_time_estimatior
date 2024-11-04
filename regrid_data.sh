@@ -1,0 +1,3 @@
+# python data_regrid.py
+cdo setgrid,"$PYFLEXTRKR_LIB_DIR/TEST/targetgrid.txt" $PYFLEXTRKR_LIB_DIR/TEST/example_preprocessing/cph_resampled.nc $PYFLEXTRKR_LIB_DIR/TEST/example_preprocessing/cph_resampled_new_grid.nc
+cdo setgrid,"$PYFLEXTRKR_LIB_DIR/TEST/targetgrid.txt" $PYFLEXTRKR_LIB_DIR/TEST/example_preprocessing/ctt_resampled.nc $PYFLEXTRKR_LIB_DIR/TEST/example_preprocessing/ctt_resampled_new_grid.nc
