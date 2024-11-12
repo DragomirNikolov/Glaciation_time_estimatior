@@ -55,11 +55,11 @@ def config_setup(work_dir: str, min_temp, max_temp, base_setup_contnet: list, ag
     temp_setup = base_setup_contnet
     # Set temp_setup names
     if agg_fact!=None:
-        temp_setup["databasename"] = f"CTT-it-{round(abs(min_temp))}-{round(abs(max_temp))}-agg_{round(agg_fact)}-"
+        temp_setup["databasename"] = f"WG-T-{round(abs(min_temp))}-{round(abs(max_temp))}-agg-{round(agg_fact)}-"
         root_path=work_dir + f'/T-{round(abs(min_temp))}-{round(abs(max_temp))}-agg-{round(agg_fact)}'
         print(root_path)
     else:
-        temp_setup["databasename"] = f"CTT-it-{round(abs(min_temp))}-{round(abs(max_temp))}-"
+        temp_setup["databasename"] = f"WG-T-{round(abs(min_temp))}-{round(abs(max_temp))}-"
         root_path=work_dir + f'/T-{round(abs(min_temp))}-{round(abs(max_temp))}'
     #Create root path folder if it doesn't exist
     if not os.path.exists(root_path):

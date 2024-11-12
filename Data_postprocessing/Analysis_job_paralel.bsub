@@ -1,0 +1,26 @@
+#!/bin/bash
+#SBATCH -J non_par_gen_task
+#SBATCH -o /cluster/work/climate/dnikolo/Job_output/Output/analysis_job_paralel.out
+#SBATCH -e /cluster/work/climate/dnikolo/Job_output/Error/analysis_job_paralel.err
+#SBATCH -t 01:00:00
+#SBATCH -N 1
+#SBATCH -n 16
+#SBATCH -q debug
+#SBATCH --mail-type=END,FAIL
+
+date
+export  HDF5_USE_FILE_LOCKING=FALSE
+WORK_DIR=/cluster/work/climate/dnikolo
+LOCAL_OUTPUT_DIR="${TMPDIR}/T-${MINTEMP}-${MAXTEMP}-agg-${AGG_FACTOR}" 
+export PyFLEXTRKR_LIB_DIR=/cluster/work/climate/dnikolo/n2o
+module load stack/2024-06 gcc/12.2.0 openmpi/4.1.6 nco ffmpeg/6.0 #python/3.11.6 
+
+rsync -aq "${WORK_DIR}/Job_output" ${TMPDIR}
+echo "Files Copied"
+source "${WORK_DIR}/flex_trkr_2/bin/activate"
+# Run Python
+cd "${WORK_DIR}" || exit
+
+python /cluster/work/climate/dnikolo/n2o/Glaciation_time_estimatior/Check_mixed.py
+# rsync -auq ${TMPDIR}/ $SLURM_SUBMIT_DIR
+date

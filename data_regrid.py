@@ -188,7 +188,7 @@ class Projection_transformer():
             raise NotImplementedError("2D var field remapping not yet added")
 
 
-def output_file_generator_remap(cph_data, var_field, lat_limited_ind, lon_limited_ind, dates, time_ind, time_units, calendar, new_file_name, Transformer):
+def output_file_generator_remap(cph_data, var_field, lon_limited_ind , lat_limited_ind, dates, time_ind, time_units, calendar, new_file_name, lon,lat):
 
     start_date = dates[0]
     test = nc.Dataset(new_file_name, 'w', format='NETCDF4')
@@ -201,7 +201,7 @@ def output_file_generator_remap(cph_data, var_field, lat_limited_ind, lon_limite
         lat_limited_ind), len(time_ind)),
     new_dataset.create_var_t(dates[time_ind], time_units, calendar),
     new_dataset.create_var_xy(
-        Transformer.new_cord_lon[lon_limited_ind], Transformer.new_cord_lat[lat_limited_ind])
+        lon[lon_limited_ind], lat[lat_limited_ind])
     # Create track variable
     new_dataset.create_track_variable('cph', var_field)
     # Copy variables from the original file, except the the ones that are manually set
@@ -299,6 +299,7 @@ if __name__ == "__main__":
     new_ctt_file_name=PyFLEXTRKR_LIB_DIR + \
         f"/TEST/example_preprocessing/ctt_resampled.nc"
     print("Generating output file")
+
     output_file_generator_remap(cph_data, cph, lat_ind, lon_ind,
                                 dates, time_ind_cph, time_units=time_units, calendar=calendar,new_file_name=new_cph_file_name, Transformer=Transformer)
     # output_file_generator_remap(ctt_data, ctt, lat_ind, lon_ind,
