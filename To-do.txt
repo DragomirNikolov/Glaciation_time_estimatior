@@ -1,1 +1,3 @@
-Colorize the Welcome text
+Write read file for the library
+Should do: Change 1h to 50 % of the lifetime
+Check: What is the difference between frame 1 and 2 of lat and lon in the auxiliary file
