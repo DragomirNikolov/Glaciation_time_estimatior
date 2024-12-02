@@ -5,6 +5,8 @@ import numpy as np
 import os
 from dateutil.relativedelta import relativedelta
 from pandas import date_range
+
+
 # Specify the folder path
 # TODO: Make it extract an env variable
 global CLAAS_FP
@@ -97,53 +99,63 @@ def generate_file_names(start_time, end_time, target_months, round_increment=15)
             file_names.extend(gen_filename_list(month_start, month_end))
     # Generate folder paths
 
-    return set(file_names)
+    return file_names
 
 
-if __name__ == "__main__":
+def find_missing_files(searched_files_set, target_months, folder_to_check):
+    for month in target_months:
+        # TODO: Make it throw and exception for the case where location doesnt exist
+        folder_path = os.path.join(CLAAS_FP, folder_to_check, month, "CPH")
+        if os.path.exists(folder_path):
+            contained_files = set([month+"/CPH/"+filename[:19]+".nc" for filename in os.listdir(
+                folder_path) if filename.startswith("CPPin")])
+            searched_files_set = searched_files_set - \
+                contained_files
+    return searched_files_set
+
+def resample_files(filenames_it):
+    transformer= Projection_transformer()
+    generate_lat_lon_prj(os.path.join(CLAAS_FP,'claas3_level2_aux_data.nc'))
+    for filename in filenames_it:
+        fp=os.path.join(CLAAS_FP, "Unprocessed_data", filenamees_it.removesuffix(".nc")+"405SVMSG01MD.nc")
+        # tranform
+        # aggregate
+        # filter
+#start_time = datetime(2004, 1, 20, 12, 5) 
+#end_time = datetime(2004, 1, 20, 13, 5)
+def filenames_to_resample(start_time , end_time ):
     # Test case
-    start_time = datetime(2004, 1, 2, 12, 5)  # Example start time
-    end_time = datetime(2004, 3, 1, 14, 5)   # Example end time
+    
     # Generate the name of the folders of each required month
     month_folder_names = generate_month_folder_names(start_time, end_time)
     print(month_folder_names)
-    unprocessed_folders = set(os.listdir(
+    # Get sets of the processed and unprocessed folders
+    unpr_folders = set(os.listdir(
         os.path.join(CLAAS_FP, "Unprocessed_data/")))
     resampled_folders = set(os.listdir(
         os.path.join(CLAAS_FP, "Resampled_data/")))
-    print(unprocessed_folders)
-    unprocessed_target_months = month_folder_names-resampled_folders
-    assert unprocessed_target_months.issubset(
-        unprocessed_folders), f"One of the month folders doesn't exist in the downloaded dataset \nMissing months={unprocessed_target_months-unprocessed_folders}"
-    print(unprocessed_target_months)
-    target_unprocessed_file_names = generate_file_names(
-        start_time, end_time, unprocessed_target_months)
-    target_unprocessed_file_names_set = set(generate_file_names(
-        start_time, end_time, unprocessed_target_months))
-    filename_list = []
-    print(len(target_unprocessed_file_names_set))
-    for month in unprocessed_target_months:
-        folder_contained_files = set([month+"/CPH/"+filename[:19]+".nc" for filename in os.listdir(
-            os.path.join(CLAAS_FP, "Unprocessed_data/", month, "CPH")) if filename.startswith("CPPin")])
-        target_unprocessed_file_names_set = target_unprocessed_file_names_set - \
-            folder_contained_files
-        # filename_check=[filename[:19]+".nc" for filename in filename_list]
-    assert len(
-        target_unprocessed_file_names_set) == 0, f"All month folders are present but some files don't exist in the downloaded dataset \nNumber of missing files = {len(target_unprocessed_file_names_set)}\nMissing files={target_unprocessed_file_names_set}"
-
     
-    # target_file_names = generate_file_names(start_time, end_time)
-    # existing_files=np.array(os.listdir( os.path.join(CLAAS_FP, "Unprocessed_data/")))
-    # existing_files=os.listdir(glob.glob(CLAAS_FP+ '/Unprocessed_data/CPH'+'/*'))
-    # existing_files=glob.glob(CLAAS_FP+ '/Unprocessed_data/CPH'+'/*')
-    # # comparison_names=existing_files[:][:19]+".nc"
+    #Check if any of the months are missing entirely from the dataset
+    unpr_target_months = month_folder_names-resampled_folders
+    assert unpr_target_months.issubset(
+        unpr_folders), f"One of the month folders doesn't exist in the downloaded dataset \nMissing months={unpr_target_months-unpr_folders}"
 
-# Loop through the files in the folder
-# for filename in os.listdir(folder_path):
-#     # Check if the file starts with 'CPPin'
-#     if filename.startswith("CPPin"):
-#         # Full path of the file
-#         new_filename=filename[:19]+".nc"
-#         file_path = os.path.join(folder_path, filename)
-#         print(f"Processing file: {file_path}")
-# xr.load_dataset("/cluster/work/climate/dnikolo/CLAAS_Data/sample_2024/CPH/ORD57534/CPPin20241001000000405SVMSGI1UD.nc")
+    # Generate a list of file names to search for in the resampled data
+    resampled_target_months = month_folder_names.intersection(
+        resampled_folders)
+    target_resampled_filenames = generate_file_names(
+        start_time, end_time, resampled_target_months)
+    # Find what part of those files are missing in the resampled data
+    missing_resampled_files = find_missing_files(
+        set(target_resampled_filenames), resampled_target_months, "Resampled_data",)
+    # Generate a list of file names to search for in the unprocessed data
+    target_unpr_file_names = generate_file_names(
+        start_time, end_time, unpr_target_months)
+    target_unpr_file_names.extend(list(missing_resampled_files))
+    # Check if any of the files are entirely missing from the data storage
+    missing_unpr_file_names = find_missing_files(
+        set(target_unpr_file_names), unpr_target_months, "Unprocessed_data")
+    assert len(
+        missing_unpr_file_names) == 0, f"All month folders are present but some files don't exist in the downloaded dataset \nNumber of missing files = {len(missing_unpr_file_names)}\nMissing files={missing_unpr_file_names}"
+    target_unpr_file_names=[os.path.join(CLAAS_FP, "Unprocessed_data", filename.removesuffix(".nc")+"405SVMSG01MD.nc") for filename in target_unpr_file_names]
+    return target_unpr_file_names
