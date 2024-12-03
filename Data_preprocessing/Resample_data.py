@@ -5,7 +5,7 @@ from pyresample.geometry import SwathDefinition
 import pyresample.kd_tree as kd_tree
 from pyresample import get_area_def
 
-class Projection_transformer():
+class ProjectionTransformer():
     def generate_lat_lon_prj(self, aux_data):
         # Import lat and longitude matrixes taht indicate the corresponding latitude and longitude of each data within the field
         lon_mat, lat_mat = aux_data["lon"][0,:,:] , aux_data["lat"][0,:,:]

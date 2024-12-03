@@ -58,13 +58,13 @@ def last_day_of_month(month_str):
 def gen_filename_list(start_time, end_time):
     folder_format = "%Y_%m"
     file_format = folder_format+"/CPH/CPPin%Y%m%d%H%M%S.nc"
-    file_names = [start_time.strftime(file_format)]
-    file_names.extend(date_range(start_time, end_time,
-                                 freq=timedelta(minutes=15)).strftime(file_format).to_list())
-    return file_names
+    filenames = [start_time.strftime(file_format)]
+    filenames.extend(date_range(start_time, end_time,
+                                freq=timedelta(minutes=15)).strftime(file_format).to_list())
+    return filenames
 
 
-def generate_file_names(start_time, end_time, target_months, round_increment=15):
+def generate_filenames(start_time, end_time, target_months, round_increment=15):
     """
     Generates a list of folder paths based on time intervals.
 
@@ -82,50 +82,41 @@ def generate_file_names(start_time, end_time, target_months, round_increment=15)
     folder_format = "%Y_%m"
     file_format = folder_format+"/CPH/CPPin%Y%m%d%H%M%S.nc"
     # Generate array of time incremented times
-    file_names = []
+    filenames = []
     for month in target_months:
         if month == start_time.strftime(folder_format):
             month_end = last_day_of_month(month)
             if end_time < month_end:
-                file_names.extend(gen_filename_list(start_time, end_time))
+                filenames.extend(gen_filename_list(start_time, end_time))
             else:
-                file_names.extend(gen_filename_list(start_time, month_end))
+                filenames.extend(gen_filename_list(start_time, month_end))
         elif month == end_time.strftime(folder_format):
             month_start = first_day_of_month(month)
-            file_names.extend(gen_filename_list(month_start, end_time))
+            filenames.extend(gen_filename_list(month_start, end_time))
         else:
             month_start = first_day_of_month(month)
             month_end = last_day_of_month(month)
-            file_names.extend(gen_filename_list(month_start, month_end))
+            filenames.extend(gen_filename_list(month_start, month_end))
     # Generate folder paths
 
-    return file_names
+    return filenames
 
 
-def find_missing_files(searched_files_set, target_months, folder_to_check):
+def find_missing_files(outer_folder_to_check, target_months, searched_files_set, inner_folder_to_check=""):
     for month in target_months:
         # TODO: Make it throw and exception for the case where location doesnt exist
-        folder_path = os.path.join(CLAAS_FP, folder_to_check, month, "CPH")
+        folder_path = os.path.join(
+            CLAAS_FP, outer_folder_to_check, month, inner_folder_to_check)
         if os.path.exists(folder_path):
-            contained_files = set([month+"/CPH/"+filename[:19]+".nc" for filename in os.listdir(
+            contained_files = set([os.path.join(month, inner_folder_to_check, filename[:19]+".nc") for filename in os.listdir(
                 folder_path) if filename.startswith("CPPin")])
+            # print(os.listdir(folder_path))
             searched_files_set = searched_files_set - \
                 contained_files
     return searched_files_set
 
-def resample_files(filenames_it):
-    transformer= Projection_transformer()
-    generate_lat_lon_prj(os.path.join(CLAAS_FP,'claas3_level2_aux_data.nc'))
-    for filename in filenames_it:
-        fp=os.path.join(CLAAS_FP, "Unprocessed_data", filenamees_it.removesuffix(".nc")+"405SVMSG01MD.nc")
-        # tranform
-        # aggregate
-        # filter
-#start_time = datetime(2004, 1, 20, 12, 5) 
-#end_time = datetime(2004, 1, 20, 13, 5)
-def filenames_to_resample(start_time , end_time ):
-    # Test case
-    
+
+def filenames_to_resample(start_time, end_time):
     # Generate the name of the folders of each required month
     month_folder_names = generate_month_folder_names(start_time, end_time)
     print(month_folder_names)
@@ -134,8 +125,8 @@ def filenames_to_resample(start_time , end_time ):
         os.path.join(CLAAS_FP, "Unprocessed_data/")))
     resampled_folders = set(os.listdir(
         os.path.join(CLAAS_FP, "Resampled_data/")))
-    
-    #Check if any of the months are missing entirely from the dataset
+
+    # Check if any of the months are missing entirely from the dataset
     unpr_target_months = month_folder_names-resampled_folders
     assert unpr_target_months.issubset(
         unpr_folders), f"One of the month folders doesn't exist in the downloaded dataset \nMissing months={unpr_target_months-unpr_folders}"
@@ -143,19 +134,23 @@ def filenames_to_resample(start_time , end_time ):
     # Generate a list of file names to search for in the resampled data
     resampled_target_months = month_folder_names.intersection(
         resampled_folders)
-    target_resampled_filenames = generate_file_names(
+    target_resampled_filenames = generate_filenames(
         start_time, end_time, resampled_target_months)
     # Find what part of those files are missing in the resampled data
-    missing_resampled_files = find_missing_files(
-        set(target_resampled_filenames), resampled_target_months, "Resampled_data",)
+    missing_resampled_filenames = find_missing_files("Resampled_data",resampled_target_months,
+        set(target_resampled_filenames))
     # Generate a list of file names to search for in the unprocessed data
-    target_unpr_file_names = generate_file_names(
+    target_unpr_filenames = generate_filenames(
         start_time, end_time, unpr_target_months)
-    target_unpr_file_names.extend(list(missing_resampled_files))
+    list_missing_resampled_filenames = list(missing_resampled_filenames)
+    target_unpr_filenames.extend(list_missing_resampled_filenames)
     # Check if any of the files are entirely missing from the data storage
-    missing_unpr_file_names = find_missing_files(
-        set(target_unpr_file_names), unpr_target_months, "Unprocessed_data")
+    unpr_target_months = unpr_target_months | set([filename.split(
+        os.path.sep)[-3] for filename in list_missing_resampled_filenames])
+    missing_unpr_filenames = find_missing_files("Unprocessed_data", unpr_target_months, set(
+        target_unpr_filenames), inner_folder_to_check="CPH")
     assert len(
-        missing_unpr_file_names) == 0, f"All month folders are present but some files don't exist in the downloaded dataset \nNumber of missing files = {len(missing_unpr_file_names)}\nMissing files={missing_unpr_file_names}"
-    target_unpr_file_names=[os.path.join(CLAAS_FP, "Unprocessed_data", filename.removesuffix(".nc")+"405SVMSG01MD.nc") for filename in target_unpr_file_names]
-    return target_unpr_file_names
+        missing_unpr_filenames) == 0, f"All month folders are present but some files don't exist in the downloaded dataset \nNumber of missing files = {len(missing_unpr_filenames)}\nMissing files={missing_unpr_filenames}"
+    target_unpr_filenames = [os.path.join(CLAAS_FP, "Unprocessed_data", filename.removesuffix(
+        ".nc")+"405SVMSG01MD.nc") for filename in target_unpr_filenames]
+    return target_unpr_filenames
