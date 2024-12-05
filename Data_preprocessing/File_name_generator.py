@@ -6,8 +6,10 @@ import numpy.core.defchararray as np_f
 # from ..Helper_fun import generate_temp_range
 
 
-def round_time(tm, round_increment):
+def round_time(tm, round_increment, round_up=False):
     """Rounds down the datetime `tm` down to the nearest `round_increment` in minutes."""
+    if round_up:
+        return tm - timedelta(minutes=tm.minute % round_increment, seconds=tm.second, microseconds=tm.microsecond) + timedelta(minutes=round_increment)
     return tm - timedelta(minutes=tm.minute % round_increment,
                           seconds=tm.second,
                           microseconds=tm.microsecond)
@@ -40,10 +42,24 @@ class MissingFilesSearcher:
         self.agg_fact = 2
         self.t_deltas = [3, 5]
 
-    def gen_filename_list(self, file_format="%Y/%m/%d/CPPin%Y%m%d%H%M%S.nc", freq=timedelta(minutes=15)):
-        filenames = [self.start_time.strftime(file_format)]
-        filenames.extend(date_range(self.start_time, self.end_time,
-                                    freq=freq).strftime(file_format).to_list())
+        # self.boundary_date = datetime(
+        #     year=2021, month=1, day=1, hour=0, minute=0, second=0)
+        self.boundary_date = datetime(
+            year=2021, month=1, day=1, hour=0, minute=0, second=0)
+
+    def gen_filename_list(self, start_time=None, end_time=None, file_format="%Y/%m/%d/CPPin%Y%m%d%H%M%S.nc", freq=timedelta(minutes=15), inclusive="both"):
+        if start_time is None:
+            start_time = self.start_time
+        else:
+            start_time = round_time(start_time, 15)
+
+        if end_time is None:
+            end_time = self.end_time
+        else:
+            end_time = round_time(end_time, 15)
+        # filenames = [start_time.strftime(file_format)]
+        filenames = date_range(start_time, end_time,
+                               freq=freq, inclusive=inclusive).strftime(file_format).to_list()
         return filenames
 
     def gen_temps_to_check(self):
@@ -96,15 +112,45 @@ class MissingFilesSearcher:
         self.filenames_to_filter = resample_filenames[resample_ind]
 
     def gen_filenames_to_resample(self, CLAAS_FP_POLE):
-        cpp_fp_format = os.path.join(
-            CLAAS_FP_POLE, "%Y/%m/%d/CPPin%Y%m%d%H%M%S405SVMSG01MD.nc")
-        ctx_fp_format = cpp_fp_format.replace("CPP", "CTX")
+        cpp_fp_format = [os.path.join(
+            CLAAS_FP_POLE, "%Y/%m/%d/CPPin%Y%m%d%H%M%S405SVMSG01MD.nc"), os.path.join(
+            CLAAS_FP_POLE, "%Y/%m/%d/CPPin%Y%m%d%H%M%S405SVMSGI1MD.nc")]
+        ctx_fp_format = [os.path.join(
+            CLAAS_FP_POLE, "%Y/%m/%d/CTXin%Y%m%d%H%M%S405SVMSG01MD.nc"), os.path.join(
+            CLAAS_FP_POLE, "%Y/%m/%d/CTXin%Y%m%d%H%M%S405SVMSGI1MD.nc")]
         ind_to_resample = self.are_missing(self.filenames_to_filter)
         # print(ind_to_resample)
-        self.cpp_files_to_resample = np.array(self.gen_filename_list(
-            file_format=cpp_fp_format))[ind_to_resample]
-        self.ctx_files_to_resample = np.array(self.gen_filename_list(
-            file_format=ctx_fp_format))[ind_to_resample]
+        if (self.start_time < self.boundary_date) & (self.end_time < self.boundary_date):
+            self.cpp_files_to_resample = np.array(self.gen_filename_list(
+                file_format=cpp_fp_format[0]))[ind_to_resample]
+            self.ctx_files_to_resample = np.array(self.gen_filename_list(
+                file_format=ctx_fp_format[0]))[ind_to_resample]
+        elif (self.start_time > self.boundary_date) & (self.end_time > self.boundary_date):
+            self.cpp_files_to_resample = np.array(self.gen_filename_list(
+                file_format=cpp_fp_format[1]))[ind_to_resample]
+            self.ctx_files_to_resample = np.array(self.gen_filename_list(
+                file_format=ctx_fp_format[1]))[ind_to_resample]
+        else:
+            self.cpp_files_to_resample = self.cross_bound_date_name_generator(
+                cpp_fp_format, ind_to_resample)
+            self.ctx_files_to_resample = self.cross_bound_date_name_generator(
+                ctx_fp_format, ind_to_resample)
+
+    def cross_bound_date_name_generator(self, fp_format_list, ind_to_resample):
+        result = []
+        start_end_time = [self.start_time, self.boundary_date, self.end_time]
+        inclusive_list = ["left", "both"]
+        for i in range(2):
+            # print(fp_format_list[i], ind_to_resample)
+            result.append(self.cross_bound_date_name_generator_single_it(
+                fp_format_list[i], ind_to_resample, start_end_time[i:i+2], inclusive=inclusive_list[i]))
+        return np.concatenate(result)
+
+    def cross_bound_date_name_generator_single_it(self, fp_format, ind_to_resample, start_end_time=[None, None], inclusive="both"):
+        files_to_resample = np.array(self.gen_filename_list(start_time=start_end_time[0], end_time=start_end_time[1],
+                                                            file_format=fp_format, inclusive=inclusive))
+        ind_short = ind_to_resample[:len(files_to_resample)]
+        return files_to_resample[ind_short]
 
     def gen_target_filenames(self):
         if self.pole_split:
@@ -129,53 +175,29 @@ class MissingFilesSearcher:
             self.result_dict["resample_CTX"] = self.ctx_files_to_resample
             # raise NotImplementedError("Not implemented for non split poles")
 
-print("Start")
-start_time = datetime(2004, 1, 20, 4, 5)
-end_time = datetime(2024, 1, 21, 5, 5)
-t_deltas = [3, 5]
-searcher = MissingFilesSearcher(start_time, end_time, t_deltas)
-searcher.gen_target_filenames()
-# print(searcher.result_dict)
-print("Dome")
+
+def check_existance_of_unpr_files(searcher):
+    file_array_names = ["resample_CPP", "resample_CTX"]
+    for pole in searcher.pole_folders:
+        for file_array_name in file_array_names:
+            filenames = searcher.result_dict[pole][file_array_name]
+            missing_ind = searcher.are_missing(filenames)
+            if (missing_ind).any():
+                print(f"There are missing {pole} {file_array_name} files")
+                missing_files = filenames[missing_ind]
+                print(missing_files[0])
+                print(len(filenames))
+                print(len(missing_files))
+            else:
+                print(f"All {pole} {file_array_name} files are present")
 
 
-# def generate_filenames(start_time, end_time, file_format="%Y/%m/%d/CPPin%Y%m%d%H%M%S.nc",  target_months=None, round_increment=15):
-#     """
-#     Generates a list of folder paths based on time intervals.
-
-#     Parameters:
-#         start_time (datetime): Start time.
-#         end_time (datetime): End time.
-#         round_increment (int): Time interval in minutes.
-
-#     Returns:
-#         list: List of folder paths for each time interval.
-#     """
-#     # Round start and end times
-#     start_time = round_time(start_time, round_increment)
-#     end_time = round_time(end_time, round_increment)
-#     if target_months is not None:
-#         raise NotImplementedError(
-#             "You need to add the case where the function is searching only within certain months")
-
-#         # Generate array of time incremented times
-#         filenames = []
-#         for month in target_months:
-#             if month == start_time.strftime(folder_format):
-#                 month_end = last_day_of_month(month)
-#                 if end_time < month_end:
-#                     filenames.extend(gen_filename_list(start_time, end_time))
-#                 else:
-#                     filenames.extend(gen_filename_list(start_time, month_end))
-#             elif month == end_time.strftime(folder_format):
-#                 month_start = first_day_of_month(month)
-#                 filenames.extend(gen_filename_list(month_start, end_time))
-#             else:
-#                 month_start = first_day_of_month(month)
-#                 month_end = last_day_of_month(month)
-#                 filenames.extend(gen_filename_list(month_start, month_end))
-#     else:
-#         filenames = gen_filename_list(start_time, end_time, file_format)
-#     # Generate folder paths
-
-#     return filenames
+if __name__ == "__main__":
+    print("Start")
+    start_time = datetime(2020, 1, 1, 0, 0)
+    end_time = datetime(2021, 11, 29, 23, 59)
+    t_deltas = [3, 5]
+    searcher = MissingFilesSearcher(start_time, end_time, t_deltas)
+    searcher.gen_target_filenames()
+    check_existance_of_unpr_files(searcher)
+    print("Done")
