@@ -5,11 +5,12 @@ from pyresample.geometry import SwathDefinition
 import pyresample.kd_tree as kd_tree
 from pyresample import get_area_def
 
+
 class ProjectionTransformer():
     def generate_lat_lon_prj(self, aux_data):
         # Import lat and longitude matrixes taht indicate the corresponding latitude and longitude of each data within the field
-        lon_mat, lat_mat = aux_data["lon"][0,:,:] , aux_data["lat"][0,:,:]
-        
+        lon_mat, lat_mat = aux_data["lon"][0, :, :], aux_data["lat"][0, :, :]
+
         # Generate variables needed for the later reshaping of the data
         self.bounds = [np.nanmin(lon_mat.astype(np.float64)), np.nanmax(lon_mat.astype(
             np.float64)), np.nanmin(lat_mat.astype(np.float64)), np.nanmax(lat_mat.astype(np.float64))]
@@ -40,16 +41,18 @@ class ProjectionTransformer():
         self.new_cord_lat = np.linspace(
             self.bounds[2], self.bounds[3], self.ny)
 
-    def remap_data(self, var_field):
+    def remap_data(self, var_field, n_resample_procs=4):
         # Satellite height
         if self.SwathDef == None:
-            raise Exception("Error: No projection parameters generated. To generate run Projection_transformer_instance.generate_lat_lon_prj().")
+            raise Exception(
+                "Error: No projection parameters generated. To generate run Projection_transformer_instance.generate_lat_lon_prj().")
         output_field = np.empty(var_field.shape)
         if len(var_field.shape) == 3:
             output_field = kd_tree.resample_nearest(self.SwathDef, var_field.transpose(1, 2, 0), self.AreaDef, radius_of_influence=60000,
-                                                    fill_value=-1, epsilon=5)  # reduce_data=True
+                                                    fill_value=-1, epsilon=5, nprocs=n_resample_procs)  # reduce_data=True
             output_field = output_field.transpose(2, 0, 1)
-            output_field[np.isnan(output_field)]=-1
+            output_field = np.flip(output_field,1)
+            output_field[np.isnan(output_field)] = -1
             return output_field
         else:
             raise NotImplementedError("2D var field remapping not yet added")

@@ -26,11 +26,12 @@ def intertwine_iterable(*lists):
 
 
 class MissingFilesSearcher:
-    def __init__(self, start_time, end_time, t_deltas):
+    def __init__(self, start_time, end_time, t_deltas, agg_fact):
         round_increment = 15
         self.start_time = round_time(start_time, round_increment)
         self.end_time = round_time(end_time, round_increment)
-
+        assert (self.start_time <
+                self.end_time), "Start time should be before end time after rounding doun to nearest 15 minutes"
         self.t_deltas = t_deltas
         self.temps_to_check = self.gen_temps_to_check()
         # CLAAS_FP shouldnt contain the CPP
@@ -39,7 +40,7 @@ class MissingFilesSearcher:
         # print(CLAAS_FP)
         self.pole_split = True
         self.pole_folders = ['np', 'sp']
-        self.agg_fact = 2
+        self.agg_fact = agg_fact
         self.t_deltas = [3, 5]
 
         # self.boundary_date = datetime(
@@ -81,18 +82,21 @@ class MissingFilesSearcher:
         return filtered_first_dt_filenames
 
     def are_missing(self, filenames):
-        vec_isfile = np.vectorize(os.path.isfile)
-        file_exists_bool = vec_isfile(filenames)
-        return np.invert(file_exists_bool)
+        if len(filenames)!=0:
+            vec_isfile = np.vectorize(os.path.isfile)
+            file_exists_bool = vec_isfile(filenames)
+            return np.invert(file_exists_bool)
+        else:
+            return None
 
     def gen_missing_filtered_filenames(self, CLAAS_FP_POLE):
         filtered_first_dt_filenames = self.gen_filtered_filenames(
             CLAAS_FP_POLE)
         self.filtered_file_missing_bool = self.are_missing(
             filtered_first_dt_filenames)
-
-        self.missing_filtered_filenames = filtered_first_dt_filenames[
-            self.filtered_file_missing_bool]
+        if self.filtered_file_missing_bool is not None:
+            self.missing_filtered_filenames = filtered_first_dt_filenames[
+                self.filtered_file_missing_bool]
         # return self.missing_filtered_filenames
 
     def gen_resample_ind(self, file_missing_bool):
@@ -111,7 +115,7 @@ class MissingFilesSearcher:
         resample_ind = self.gen_resample_ind(self.filtered_file_missing_bool)
         self.filenames_to_filter = resample_filenames[resample_ind]
 
-    def gen_filenames_to_resample(self, CLAAS_FP_POLE):
+    def gen_unpr_filenames_to_resample(self, CLAAS_FP_POLE):
         cpp_fp_format = [os.path.join(
             CLAAS_FP_POLE, "%Y/%m/%d/CPPin%Y%m%d%H%M%S405SVMSG01MD.nc"), os.path.join(
             CLAAS_FP_POLE, "%Y/%m/%d/CPPin%Y%m%d%H%M%S405SVMSGI1MD.nc")]
@@ -119,22 +123,25 @@ class MissingFilesSearcher:
             CLAAS_FP_POLE, "%Y/%m/%d/CTXin%Y%m%d%H%M%S405SVMSG01MD.nc"), os.path.join(
             CLAAS_FP_POLE, "%Y/%m/%d/CTXin%Y%m%d%H%M%S405SVMSGI1MD.nc")]
         ind_to_resample = self.are_missing(self.filenames_to_filter)
-        # print(ind_to_resample)
-        if (self.start_time < self.boundary_date) & (self.end_time < self.boundary_date):
-            self.cpp_files_to_resample = np.array(self.gen_filename_list(
-                file_format=cpp_fp_format[0]))[ind_to_resample]
-            self.ctx_files_to_resample = np.array(self.gen_filename_list(
-                file_format=ctx_fp_format[0]))[ind_to_resample]
-        elif (self.start_time > self.boundary_date) & (self.end_time > self.boundary_date):
-            self.cpp_files_to_resample = np.array(self.gen_filename_list(
-                file_format=cpp_fp_format[1]))[ind_to_resample]
-            self.ctx_files_to_resample = np.array(self.gen_filename_list(
-                file_format=ctx_fp_format[1]))[ind_to_resample]
-        else:
-            self.cpp_files_to_resample = self.cross_bound_date_name_generator(
-                cpp_fp_format, ind_to_resample)
-            self.ctx_files_to_resample = self.cross_bound_date_name_generator(
-                ctx_fp_format, ind_to_resample)
+        if ind_to_resample is not None:
+            self.agg_result_names = self.filenames_to_filter[ind_to_resample]
+            self.resample_result_names = np.char.replace(self.agg_result_names, f"Agg_{self.agg_fact:02}", "Agg_01")
+            # print(ind_to_resample)
+            if (self.start_time < self.boundary_date) & (self.end_time < self.boundary_date):
+                self.cpp_files_to_resample = np.array(self.gen_filename_list(
+                    file_format=cpp_fp_format[0]))[ind_to_resample]
+                self.ctx_files_to_resample = np.array(self.gen_filename_list(
+                    file_format=ctx_fp_format[0]))[ind_to_resample]
+            elif (self.start_time >= self.boundary_date) & (self.end_time >= self.boundary_date):
+                self.cpp_files_to_resample = np.array(self.gen_filename_list(
+                    file_format=cpp_fp_format[1]))[ind_to_resample]
+                self.ctx_files_to_resample = np.array(self.gen_filename_list(
+                    file_format=ctx_fp_format[1]))[ind_to_resample]
+            else:
+                self.cpp_files_to_resample = self.cross_bound_date_name_generator(
+                    cpp_fp_format, ind_to_resample)
+                self.ctx_files_to_resample = self.cross_bound_date_name_generator(
+                    ctx_fp_format, ind_to_resample)
 
     def cross_bound_date_name_generator(self, fp_format_list, ind_to_resample):
         result = []
@@ -158,21 +165,25 @@ class MissingFilesSearcher:
                                        "resample_CTX": None} for pole in self.pole_folders}
             for pole in self.pole_folders:
                 CLAAS_FP_POLE = os.path.join(self.CLAAS_FP, pole)
-                self.gen_missing_filtered_filenames(CLAAS_FP_POLE)
-                self.gen_filenames_to_filter(CLAAS_FP_POLE)
-                self.gen_filenames_to_resample(CLAAS_FP_POLE)
+                self.gen_missing_filtered_filenames(
+                    os.path.join(self.CLAAS_FP, "Filtered_Data", pole))
+                self.gen_filenames_to_filter(os.path.join(self.CLAAS_FP, "Resampled_Data", pole))
+                self.gen_unpr_filenames_to_resample(CLAAS_FP_POLE)
                 self.result_dict[pole]["filter"] = self.filenames_to_filter
                 self.result_dict[pole]["resample_CPP"] = self.cpp_files_to_resample
                 self.result_dict[pole]["resample_CTX"] = self.ctx_files_to_resample
+                self.result_dict[pole]["resample_res"] = self.resample_result_names
+                self.result_dict[pole]["agg_res"] = self.agg_result_names
         else:
             self.result_dict = {"filter": None,
                                 "resample_CPP": None, "resample_CTX": None}
             self.gen_missing_filtered_filenames(self.CLAAS_FP)
             self.gen_filenames_to_filter(self.CLAAS_FP)
-            self.gen_filenames_to_resample(self.CLAAS_FP)
+            self.gen_unpr_filenames_to_resample(self.CLAAS_FP)
             self.result_dict["filter"] = self.filenames_to_filter
             self.result_dict["resample_CPP"] = self.cpp_files_to_resample
             self.result_dict["resample_CTX"] = self.ctx_files_to_resample
+            self.result_dict["resample_res"] = self.resample_result_names
             # raise NotImplementedError("Not implemented for non split poles")
 
 
@@ -182,14 +193,22 @@ def check_existance_of_unpr_files(searcher):
         for file_array_name in file_array_names:
             filenames = searcher.result_dict[pole][file_array_name]
             missing_ind = searcher.are_missing(filenames)
-            if (missing_ind).any():
-                print(f"There are missing {pole} {file_array_name} files")
-                missing_files = filenames[missing_ind]
-                print(missing_files[0])
-                print(len(filenames))
-                print(len(missing_files))
+            if missing_ind is not None:
+                if (missing_ind).any():
+                    print(f"There are missing {pole} {file_array_name} files")
+                    missing_files = filenames[missing_ind]
+                    print(missing_files[0])
+                    print(len(filenames))
+                    print(len(missing_files))
             else:
                 print(f"All {pole} {file_array_name} files are present")
+
+
+def generate_filename_dict(start_time, end_time, t_deltas, agg_fact):
+    searcher = MissingFilesSearcher(start_time, end_time, t_deltas, agg_fact)
+    searcher.gen_target_filenames()
+    check_existance_of_unpr_files(searcher)
+    return searcher.result_dict
 
 
 if __name__ == "__main__":
