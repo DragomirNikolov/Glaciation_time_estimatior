@@ -1,0 +1,64 @@
+#!/bin/bash
+#SBATCH -J test_pyflextrkr
+#SBATCH -t 03:00:00
+#SBATCH -N 1
+#SBATCH -n 16
+#SBATCH -q debug
+#SBATCH --mail-type=END,FAIL
+
+date
+
+declare -i min_temp
+declare -i max_temp
+declare -i agg_fact
+start_time=""
+end_time=""
+
+print_usage() {
+    printf "Usage: ..."
+}
+
+while getopts 'h:l:a:s:e:p:' flag; do
+    case "${flag}" in
+    h) max_temp=${OPTARG#-} ;;
+    l) min_temp=${OPTARG#-} ;;
+    a) agg_fact=${OPTARG} ;;
+    s) start_time=${OPTARG} ;;
+    e) end_time=${OPTARG} ;;
+    p) pole=${OPTARG} ;;
+    *)
+        print_usage
+        exit 1
+        ;;
+    esac
+done
+
+
+
+#Copy files to local scratch
+# export TMPDIR="/cluster/work/climate/dnikolo/dump"
+GTE_DIR=/cluster/work/climate/dnikolo/n2o/Glaciation_time_estimatior
+ENV_BIN_DIR=/cluster/work/climate/dnikolo/flex_trkr_2/bin
+RESULT_DIR="${TMPDIR}/Result"
+
+
+#Change variable to counteract a common error in PyFLEXTRKR
+export HDF5_USE_FILE_LOCKING=FALSE
+module load stack/2024-06 gcc/12.2.0 openmpi/4.1.6 nco ffmpeg/6.0 #python/3.11.6
+
+#Load pyflextrkr python
+source "${ENV_BIN_DIR}"/activate
+
+python Copy_files.py -af "$agg_fact" -et "$end_time" -st "$start_time" -t "$min_temp" "$max_temp" -p $pole
+# Generate setup file for the iteration in ${TMPDIR}/T-${MINTEMP}-${MAXTEMP}
+# #echo "/cluster/work/climate/dnikolo/n2o/Glaciation_time_estimatior/Config_generator.py -t $MINTEMP $MAXTEMP -bc /cluster/work/climate/dnikolo/n2o/Glaciation_time_estimatior/custom_setup.yml -af $AGG_FACTOR"
+python "${GTE_DIR}/Cloud_tracking/Generate_config.py" -t $min_temp $max_temp -bc "${GTE_DIR}/Cloud_tracking/custom_setup.yml" -af "${agg_fact}" -st "${start_time}" -et "${end_time}"
+
+cd "$RESULT_DIR" || exit
+# #Run PyFLEXTRKR
+
+python /cluster/work/climate/dnikolo/n2o/PyFLEXTRKR/runscripts/run_generic_tracking.py ./setup.yml
+OUTPUT_DIR="${WORK_DIR}/Job_output/Agg_${agg_fact}_T_${min_temp}_${max_temp}_t_${start_time}_${end_time}/${pole}"
+mkdir -p "${OUTPUT_DIR}"
+rsync -auq "${RESULT_DIR}/" "${OUTPUT_DIR}"
+date

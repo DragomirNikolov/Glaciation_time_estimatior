@@ -169,11 +169,12 @@ class MissingFilesSearcher:
                     os.path.join(self.CLAAS_FP, "Filtered_Data", pole))
                 self.gen_filenames_to_filter(os.path.join(self.CLAAS_FP, "Resampled_Data", pole))
                 self.gen_unpr_filenames_to_resample(CLAAS_FP_POLE)
-                self.result_dict[pole]["filter"] = self.filenames_to_filter
                 self.result_dict[pole]["resample_CPP"] = self.cpp_files_to_resample
                 self.result_dict[pole]["resample_CTX"] = self.ctx_files_to_resample
                 self.result_dict[pole]["resample_res"] = self.resample_result_names
                 self.result_dict[pole]["agg_res"] = self.agg_result_names
+                self.result_dict[pole]["filter"] = self.filenames_to_filter
+                
         else:
             self.result_dict = {"filter": None,
                                 "resample_CPP": None, "resample_CTX": None}

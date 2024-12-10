@@ -1,5 +1,10 @@
 Add config_file
 
+Make result output go to n2o
+Resampling multiprocessing
+add right formating of agg(e.g. 3 is 03 but 10 is 10 ) in jon utput folders
+Make scp copy only required files instead of whole folder
+Figure out how to use and import folder as a library
 Add a read-me file for the library
 Should do: Change 1h to 50 % of the lifetime
 Check: What is the difference between frame 1 and 2 of lat and lon in the auxiliary file
