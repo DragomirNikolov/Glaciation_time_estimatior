@@ -41,14 +41,14 @@ class ProjectionTransformer():
         self.new_cord_lat = np.linspace(
             self.bounds[2], self.bounds[3], self.ny)
 
-    def remap_data(self, var_field, n_resample_procs=4):
+    def remap_data(self, var_field, n_resample_procs=8):
         # Satellite height
         if self.SwathDef == None:
             raise Exception(
                 "Error: No projection parameters generated. To generate run Projection_transformer_instance.generate_lat_lon_prj().")
         output_field = np.empty(var_field.shape)
         if len(var_field.shape) == 3:
-            output_field = kd_tree.resample_nearest(self.SwathDef, var_field.transpose(1, 2, 0), self.AreaDef, radius_of_influence=60000,
+            output_field = kd_tree.resample_nearest(self.SwathDef, var_field.transpose("y", "x", "time").values, self.AreaDef, radius_of_influence=60000,
                                                     fill_value=-1, epsilon=5, nprocs=n_resample_procs)  # reduce_data=True
             output_field = output_field.transpose(2, 0, 1)
             output_field = np.flip(output_field,1)
