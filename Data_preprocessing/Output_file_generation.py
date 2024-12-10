@@ -20,7 +20,7 @@ class OutputFile:
                                  "long_name": "longitude",
                                  "units": "degrees_east", }
 
-    def set_output_cpp_variables(self, resampled_cph_data):
+    def set_cpp_output_variables(self, resampled_cph_data):
         self.cph_ds["cph_resampled"] = xr.DataArray(
             resampled_cph_data,
             dims=("time", "lat", "lon"),
@@ -37,7 +37,7 @@ class OutputFile:
                 "_FillValue": np.int16(-1),
             }
         )
-    def set_output_ctx_variables(self, resampled_ctt_data, resampled_cth_data):
+    def set_ctx_output_variables(self, resampled_ctt_data, resampled_cth_data):
         self.cph_ds["ctt_resampled"] = xr.DataArray(
             resampled_ctt_data.astype(np.float32),
             dims=("time", "lat", "lon"),
