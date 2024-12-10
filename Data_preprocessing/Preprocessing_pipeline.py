@@ -23,7 +23,25 @@ def generate_temp_range(t_deltas: list) -> tuple:
     return t_min, t_max
 
 
-def generate_output(target_filenames):
+def fps_by_folder(fp_arr_target):
+    vec_dirname = np.vectorize(os.path.dirname)
+    _, folder_start_ind = np.unique(
+        vec_dirname(fp_arr_target), return_index=True)
+    fps_by_folder = []
+    for ind in range(len(folder_start_ind)):
+        # print("b")
+        if ind < len(folder_start_ind)-1:
+            start_ind = folder_start_ind[ind]
+            end_ind = folder_start_ind[ind+1]
+            fps_by_folder.append(fp_arr_target[start_ind:end_ind])
+            # print(start_ind, end_ind)
+        else:
+            start_ind = folder_start_ind[ind]
+            fps_by_folder.append(fp_arr_target[start_ind:])
+    return fps_by_folder
+
+
+def generate_resampled_output(target_filenames):
     pole_folders = ["np", "sp"]
     aux_fps = {"np": "/wolke_scratch/dnikolo/CLAAS_Data/np/CM_SAF_CLAAS3_L2_AUX.nc",
                "sp": "/wolke_scratch/dnikolo/CLAAS_Data/sp/CM_SAF_CLAAS3_L2_AUX.nc"}
@@ -32,118 +50,99 @@ def generate_output(target_filenames):
         aux_data = xr.load_dataset(os.path.join(
             CLAAS_FP, aux_fps[pole]), decode_times=False)
         transformer.generate_lat_lon_prj(aux_data)
-        for filename_ind in range(len(target_filenames[pole]["resample_CPP"])):
-            # xr.load_mfdataset(filenames_it)
-            # Load new dataset
-            cpp_filename = target_filenames[pole]["resample_CPP"][filename_ind]
-            ctx_filename = target_filenames[pole]["resample_CTX"][filename_ind]
+        if len(target_filenames[pole]["resample_CTX"]) == 0:
+            continue
+        folder_fps_CTX = fps_by_folder(target_filenames[pole]["resample_CTX"])
+        folder_fps_CPP = fps_by_folder(target_filenames[pole]["resample_CPP"])
+        folder_resample_res_fps = fps_by_folder(
+            target_filenames[pole]["resample_res"])
 
+        for folder_fp_ind in range(len(folder_fps_CTX)):
             # Open relevant datasets
-            input_cpp_ds = xr.load_dataset(cpp_filename)
-            input_ctx_ds = xr.load_dataset(ctx_filename)
+            print(len(folder_fps_CTX[folder_fp_ind]))
+            print(len(folder_fps_CPP[folder_fp_ind]))
+            input_ctx_ds=xr.open_mfdataset(
+                    list(folder_fps_CTX[folder_fp_ind]), parallel=True, chunks={"time": len(folder_fps_CTX[folder_fp_ind]), "x": aux_data.sizes["x"], "y": aux_data.sizes["y"]})
+            input_cpp_ds=xr.open_mfdataset(
+                    list(folder_fps_CPP[folder_fp_ind]), parallel=True, chunks={"time": len(folder_fps_CPP[folder_fp_ind]), "x": aux_data.sizes["x"], "y": aux_data.sizes["y"]})
 
-            # Resample dataset contents
-            resampled_cph_data = transformer.remap_data(
-                input_cpp_ds["cph"].data)
-            resampled_ctt_data = transformer.remap_data(
-                input_ctx_ds["ctt"].data)
-            resampled_cth_data = transformer.remap_data(
-                input_ctx_ds["cth"].data)
-            print(f"Resampled: {cpp_filename} and {ctx_filename}")
-            # Generate output file and save result
-            output_file = OutputResampledFile(
-                input_cpp_ds, input_ctx_ds, agg_fact=1)
+            output_file=OutputResampledFile(
+                input_cpp_ds, agg_fact=1)
             output_file.add_coords(transformer.new_cord_lat,
-                                   transformer.new_cord_lon)
-            output_file.set_output_variables(
-                resampled_cph_data, resampled_ctt_data, resampled_cth_data)
-            resample_res_fp = target_filenames[pole]["resample_res"][filename_ind]
-            agg_res_fp = target_filenames[pole]["agg_res"][filename_ind]
-            output_file.save_file(resample_res_fp)
+                                transformer.new_cord_lon)
+            # Resample cpx dataset contents
+            resampled_ctt_data=transformer.remap_data(
+                input_ctx_ds["ctt"])
+            resampled_cth_data=transformer.remap_data(
+                input_ctx_ds["cth"])
+            output_file.set_ctx_output_variables(
+                resampled_ctt_data, resampled_cth_data)
+            del resampled_ctt_data, resampled_cth_data
+            input_ctx_ds.close()
+            # Resample cpp dataset contents
+            resampled_cph_data=transformer.remap_data(
+                input_cpp_ds["cph"])
+            output_file.set_cpp_output_variables(
+                resampled_cph_data)
+
+            print(
+                f"Resampled day {folder_fp_ind} starting with fp: {folder_fps_CTX[folder_fp_ind][0]}")
+            # Generate output file and save result
+
+
+            output_file.save_file(folder_resample_res_fps[folder_fp_ind])
             # Close dataset
             input_cpp_ds.close()
-            subprocess.run(["cdo", f"gridboxmean,{agg_fact},{agg_fact}",
-                           "-selname,cph_resampled,ctt_resampled", resample_res_fp, agg_res_fp])
+
+
+
+            # agg_res_fp = target_filenames[pole]["agg_res"][filename_ind]
+            # subprocess.run(["cdo", f"gridboxmean,{agg_fact},{agg_fact}",
+            #                 "-selname,cph_resampled,ctt_resampled", resample_res_fp, agg_res_fp])
 
         aux_data.close()
 
 
 def generate_filtered_output_fps(day_fp, agg_fact, min_temp, max_temp):
-    output_fp = day_fp
-    output_fp = np.char.replace(output_fp, "Resampled_Data", "Filtered_Data")
-    output_fp = np.char.replace(
-        output_fp, f"Agg_{agg_fact:02}", f"Agg_{agg_fact:02}_T_{abs(min_temp)}_{abs(max_temp)}")
+    output_fp=day_fp
+    output_fp=np.char.replace(output_fp, "Resampled_Data", "Filtered_Data")
+    output_fp=np.char.replace(
+        output_fp, f"Agg_{agg_fact:02}", f"Agg_{agg_fact:02}_T_{abs(min_temp):02}_{abs(max_temp):02}")
     os.makedirs(os.path.dirname(output_fp[0]), exist_ok=True)
     return output_fp
 
 
-def generate__filtered_files(target_filenames, t_deltas, agg_fact):
-    pole_folders = ["np", "sp"]
-    # aux_fps = {"np": "/wolke_scratch/dnikolo/CLAAS_Data/np/CM_SAF_CLAAS3_L2_AUX.nc" , "sp": "/wolke_scratch/dnikolo/CLAAS_Data/sp/CM_SAF_CLAAS3_L2_AUX.nc"}
-    temp_bounds = generate_temp_range(t_deltas)
+def generate_filtered_files(target_filenames, t_deltas, agg_fact):
+    pole_folders=["np", "sp"]
+    temp_bounds=generate_temp_range(t_deltas)
     for pole in pole_folders:
-        # print("a")
-        # filter = TempFilter(t_deltas)
-        fp_to_filter = target_filenames[pole]["filter"]
-        vec_dirname = np.vectorize(os.path.dirname)
-        # print(vec_dirname(fp_to_filter))
-        _ , folder_start_ind = np.unique(
-            vec_dirname(fp_to_filter), return_index=True)
-
-        for ind in range(len(folder_start_ind)):
-            # print("b")
-            if ind < len(folder_start_ind)-1:
-                start_ind = folder_start_ind[ind]
-                end_ind = folder_start_ind[ind+1]
-                day_fp_to_filter = fp_to_filter[start_ind:end_ind]
-                # print(start_ind, end_ind)
-            else:
-                start_ind = folder_start_ind[ind]
-                day_fp_to_filter = fp_to_filter[start_ind:]
-                # print(start_ind)
-
-            # print(day_fp_to_filter)
-            combined_ds = xr.open_mfdataset(
+        for day_fp_to_filter in fps_by_folder(target_filenames[pole]["filter"]):
+            combined_ds=xr.open_mfdataset(
                 list(day_fp_to_filter), parallel=True)
             for temp_ind in range(len(temp_bounds[0])):
-                min_temp = temp_bounds[0][temp_ind]
-                max_temp = temp_bounds[1][temp_ind]
-                mask = (combined_ds['ctt_resampled'] >= 273.15 +
+                min_temp=temp_bounds[0][temp_ind]
+                max_temp=temp_bounds[1][temp_ind]
+                mask=(combined_ds['ctt_resampled'] >= 273.15 +
                         min_temp) & (combined_ds['ctt_resampled'] <= 273.15+max_temp)
-                combined_ds['cph_filtered'] = xr.where(
+                combined_ds['cph_filtered']=xr.where(
                     mask, combined_ds['cph_resampled'], 0).compute()
-                output_fps = generate_filtered_output_fps(
+                output_fps=generate_filtered_output_fps(
                     day_fp_to_filter, agg_fact, min_temp, max_temp)
-                _, dataset_list = zip(
+                _, dataset_list=zip(
                     *(combined_ds.groupby("time")))
                 xr.save_mfdataset(dataset_list, list(output_fps))
-            # for cph_filtered in filter.filter_data(resampled_ds):
-            #     OutputFilteredFile()
-
-            #     print(f"Resampled: {cpp_filename} and {ctx_filename}")
-            #     # Generate output file and save result
-            #     output_file = OutputResampledFile(
-            #         input_cpp_ds, input_ctx_ds, 1)
-            #     output_file.add_coords(transformer.new_cord_lat,
-            #                            transformer.new_cord_lon)
-            #     output_file.set_output_variables(
-            #         resampled_cph_data, resampled_ctt_data, resampled_cth_data)
-            #     output_file.save_file(
-            #         target_filenames[pole]["resample_res"][filename_ind])
-            #     # Close dataset
-            #     input_cpp_ds.close()
 
 
 if __name__ == "__main__":
     print("Generating target filenames")
-    t_deltas = [5]
-    agg_fact = 3
-    target_filenames = generate_filename_dict(start_time=datetime(
-        2023, 1, 8, 0, 15), end_time=datetime(2023, 1, 15, 0, 0), t_deltas=t_deltas, agg_fact=agg_fact)
+    t_deltas=[5]
+    agg_fact=3
+    target_filenames=generate_filename_dict(start_time=datetime(
+        2023, 1, 17, 0, 00), end_time=datetime(2023, 1, 18, 23, 45), t_deltas=t_deltas, agg_fact=agg_fact)
 
     print(target_filenames)
     print("Target filenames generated")
     print("Resampling needed files")
-    generate_output(target_filenames)
-    generate__filtered_files(target_filenames, t_deltas, agg_fact=agg_fact)
+    generate_resampled_output(target_filenames)
+    generate_filtered_files(target_filenames, t_deltas, agg_fact=agg_fact)
     print("Needed files resampled")
