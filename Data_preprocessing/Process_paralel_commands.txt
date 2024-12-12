@@ -1,0 +1,10 @@
+python /wolke_scratch/dnikolo/Glaciation_time_estimatior/Data_preprocessing/Preprocessing_pipeline.py -st 202302010000 -et 202303010000
+python /wolke_scratch/dnikolo/Glaciation_time_estimatior/Data_preprocessing/Preprocessing_pipeline.py -st 202303010000 -et 202304010000
+python /wolke_scratch/dnikolo/Glaciation_time_estimatior/Data_preprocessing/Preprocessing_pipeline.py -st 202304010000 -et 202305010000
+python /wolke_scratch/dnikolo/Glaciation_time_estimatior/Data_preprocessing/Preprocessing_pipeline.py -st 202305010000 -et 202306010000
+python /wolke_scratch/dnikolo/Glaciation_time_estimatior/Data_preprocessing/Preprocessing_pipeline.py -st 202306010000 -et 202307010000
+python /wolke_scratch/dnikolo/Glaciation_time_estimatior/Data_preprocessing/Preprocessing_pipeline.py -st 202307010000 -et 202308010000
+python /wolke_scratch/dnikolo/Glaciation_time_estimatior/Data_preprocessing/Preprocessing_pipeline.py -st 202308010000 -et 202309010000
+python /wolke_scratch/dnikolo/Glaciation_time_estimatior/Data_preprocessing/Preprocessing_pipeline.py -st 202309010000 -et 202310010000
+python /wolke_scratch/dnikolo/Glaciation_time_estimatior/Data_preprocessing/Preprocessing_pipeline.py -st 202310010000 -et 202311010000
+python /wolke_scratch/dnikolo/Glaciation_time_estimatior/Data_preprocessing/Preprocessing_pipeline.py -st 202310010000 -et 202401010000

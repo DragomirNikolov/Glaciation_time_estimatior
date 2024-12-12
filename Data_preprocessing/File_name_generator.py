@@ -87,16 +87,16 @@ class MissingFilesSearcher:
             file_exists_bool = vec_isfile(filenames)
             return np.invert(file_exists_bool)
         else:
-            return None
+            return np.array([], dtype=bool)
 
     def gen_missing_filtered_filenames(self, CLAAS_FP_POLE):
         filtered_first_dt_filenames = self.gen_filtered_filenames(
             CLAAS_FP_POLE)
         self.filtered_file_missing_bool = self.are_missing(
             filtered_first_dt_filenames)
-        if self.filtered_file_missing_bool is not None:
-            self.missing_filtered_filenames = filtered_first_dt_filenames[
-                self.filtered_file_missing_bool]
+        # if len(self.filtered_file_missing_bool)!=0:
+        self.missing_filtered_filenames = filtered_first_dt_filenames[
+            self.filtered_file_missing_bool]
         # return self.missing_filtered_filenames
 
     def gen_resample_ind(self, file_missing_bool):
@@ -112,8 +112,8 @@ class MissingFilesSearcher:
             CLAAS_FP_POLE, f"%Y/%m/%d/Agg_{self.agg_fact:02}_%Y%m%d%H%M%S.nc")
         resample_filenames = np.array(
             self.gen_filename_list(file_format=resampled_fp_format))
-        resample_ind = self.gen_resample_ind(self.filtered_file_missing_bool)
-        self.filenames_to_filter = resample_filenames[resample_ind]
+        self.resample_ind = self.gen_resample_ind(self.filtered_file_missing_bool)
+        self.filenames_to_filter = resample_filenames[self.resample_ind]
 
     def gen_unpr_filenames_to_resample(self, CLAAS_FP_POLE):
         cpp_fp_format = [os.path.join(
@@ -129,19 +129,19 @@ class MissingFilesSearcher:
             # print(ind_to_resample)
             if (self.start_time < self.boundary_date) & (self.end_time < self.boundary_date):
                 self.cpp_files_to_resample = np.array(self.gen_filename_list(
-                    file_format=cpp_fp_format[0]))[ind_to_resample]
+                    file_format=cpp_fp_format[0]))[self.resample_ind][ind_to_resample]
                 self.ctx_files_to_resample = np.array(self.gen_filename_list(
-                    file_format=ctx_fp_format[0]))[ind_to_resample]
+                    file_format=ctx_fp_format[0]))[self.resample_ind][ind_to_resample]
             elif (self.start_time >= self.boundary_date) & (self.end_time >= self.boundary_date):
                 self.cpp_files_to_resample = np.array(self.gen_filename_list(
-                    file_format=cpp_fp_format[1]))[ind_to_resample]
+                    file_format=cpp_fp_format[1]))[self.resample_ind][ind_to_resample]
                 self.ctx_files_to_resample = np.array(self.gen_filename_list(
-                    file_format=ctx_fp_format[1]))[ind_to_resample]
+                    file_format=ctx_fp_format[1]))[self.resample_ind][ind_to_resample]
             else:
                 self.cpp_files_to_resample = self.cross_bound_date_name_generator(
-                    cpp_fp_format, ind_to_resample)
+                    cpp_fp_format, ind_to_resample)[self.resample_ind][ind_to_resample]
                 self.ctx_files_to_resample = self.cross_bound_date_name_generator(
-                    ctx_fp_format, ind_to_resample)
+                    ctx_fp_format, ind_to_resample)[self.resample_ind][ind_to_resample]
 
     def cross_bound_date_name_generator(self, fp_format_list, ind_to_resample):
         result = []

@@ -1,5 +1,7 @@
 Add config_file
 
+Make whole program a package
+put parse_cmd_args in helper function 
 Make result output go to n2o
 Resampling multiprocessing
 add right formating of agg(e.g. 3 is 03 but 10 is 10 ) in jon utput folders
