@@ -2,13 +2,11 @@ import os
 import xarray as xr
 from datetime import datetime
 import numpy as np
-import subprocess
-import time
-import threading
 from Resample_data import ProjectionTransformer
+from Temp_filter import TempFilter
 from File_name_generator import generate_filename_dict
-from Output_file_generation import OutputResampledFile
-
+from Output_file_generation import OutputFilteredFile, OutputResampledFile
+import subprocess
 global CLAAS_FP
 CLAAS_FP = os.environ["CLAAS_DIR"]
 
@@ -176,8 +174,4 @@ if __name__ == "__main__":
     generate_resampled_output(target_filenames)
     print("Needed files resampled. Start filtering")
     generate_filtered_files(target_filenames, t_deltas, agg_fact=agg_fact)
-<<<<<<< HEAD
-    print("Needed files resampled")
-=======
     print("Filtering complete")
->>>>>>> 13394e0cf9e8d177816d28ed2200ef8343a6da5b
