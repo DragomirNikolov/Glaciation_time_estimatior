@@ -41,7 +41,7 @@ class MissingFilesSearcher:
         self.pole_split = True
         self.pole_folders = ['np', 'sp']
         self.agg_fact = agg_fact
-        self.t_deltas = [3, 5]
+        self.t_deltas = t_deltas
 
         # self.boundary_date = datetime(
         #     year=2021, month=1, day=1, hour=0, minute=0, second=0)
@@ -187,6 +187,18 @@ class MissingFilesSearcher:
             self.result_dict["resample_res"] = self.resample_result_names
             # raise NotImplementedError("Not implemented for non split poles")
 
+    def gen_cloudtrack_filenames(self, job_output_folder):
+        cloudtracks_fps = {}
+        folder_name=f"{self.start_time.srptime(folder_time_format)}_{self.end_time.srptime(folder_time_format)}"
+        filename_format="cloudtracks_%Y%m%d_%H%M%S.nc"
+        for temp_ind in range(len(self.temps_to_check[0])):
+            min_temp = self.temps_to_check[0][temp_ind]
+            max_temp = self.temps_to_check[1][temp_ind]
+            folder_time_format="%Y%m%d.%H%M"
+            cloudtracks_fp_format = os.path.join(
+                job_output_folder, f"Agg_{self.agg_fact:02}_T_{max_temp:02}_{min_temp:02}", "pixel_path_tracking", folder_name, filename_format)
+            cloudtracks_fps[f"{abs(min_temp)}_{abs(min_temp)}"] = np.array(self.gen_filename_list(file_format=cloudtracks_fp_format))
+        return cloudtracks_fps
 
 def check_existance_of_unpr_files(searcher):
     file_array_names = ["resample_CPP", "resample_CTX"]

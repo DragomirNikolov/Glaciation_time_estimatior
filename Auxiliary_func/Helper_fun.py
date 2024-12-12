@@ -21,3 +21,5 @@ def generate_temp_range(t_deltas: list) -> tuple:
         t_min = np.concatenate((t_min, boundary_temps[1:].astype(int)))
         t_max = np.concatenate((t_max, boundary_temps[0:-1].astype(int)))
     return t_min, t_max
+
+def get_env_variable(name):
