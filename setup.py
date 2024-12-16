@@ -8,11 +8,11 @@ setup(
     author_email="dnikolo@student.ethz.ch",
     url="https://github.com/yourusername/Glaciation_time_estimator",  # Update with your repository URL
     packages=find_packages(
-        include=["Auxiliary_func", "Data_preprocessing", "Data_postprocessing"]
+        include=["Auxiliary_func", "Data_preprocessing", "Data_postprocessing", "Cloud_tracking"]
     ),  # Only include the relevant packages
     include_package_data=True,
     install_requires=[
         "numpy",  # List your dependencies here
     ],
-    python_requires=">=3.11",
+    python_requires=">=3.09",
 )

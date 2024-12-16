@@ -1,4 +1,5 @@
 import numpy as np
+import os
 #####
 # find time indexes at which there is data from both datasets
 # returns (indexes of common time in time1 , ---//--- in time2)
@@ -22,4 +23,12 @@ def generate_temp_range(t_deltas: list) -> tuple:
         t_max = np.concatenate((t_max, boundary_temps[0:-1].astype(int)))
     return t_min, t_max
 
-def get_env_variable(name):
+
+def get_env_variable(name, fail=False, replace_dir="/cluster/work/climate/dnikolo/dump"):
+    var = os.environ[name]
+    if (var == ""):
+        if fail:
+            raise ValueError(f"Env variable {name} not set")
+        else:
+            var = replace_dir
+    return var

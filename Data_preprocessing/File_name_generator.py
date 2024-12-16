@@ -3,6 +3,7 @@ import numpy as np
 import os
 from pandas import date_range
 import numpy.core.defchararray as np_f
+from Glaciation_time_estimator.Auxiliary_func.config_reader import read_config
 # from ..Helper_fun import generate_temp_range
 
 
@@ -26,27 +27,27 @@ def intertwine_iterable(*lists):
 
 
 class MissingFilesSearcher:
-    def __init__(self, start_time, end_time, t_deltas, agg_fact):
+    def __init__(self, config):
         round_increment = 15
-        self.start_time = round_time(start_time, round_increment)
-        self.end_time = round_time(end_time, round_increment)
+        self.start_time = round_time(config['start_time'], round_increment)
+        self.end_time = round_time(config['end_time'], round_increment)
         assert (self.start_time <
                 self.end_time), "Start time should be before end time after rounding doun to nearest 15 minutes"
-        self.t_deltas = t_deltas
+        self.t_deltas = config['t_deltas']
         self.temps_to_check = self.gen_temps_to_check()
+        self.min_temp_arr = config['min_temp_arr']
+        self.max_temp_arr = config['max_temp_arr']
         # CLAAS_FP shouldnt contain the CPP
 
-        self.CLAAS_FP = os.environ["CLAAS_DIR"]
+        self.CLAAS_FP = config['CLAAS_fp']
         # print(CLAAS_FP)
-        self.pole_split = True
-        self.pole_folders = ['np', 'sp']
-        self.agg_fact = agg_fact
-        self.t_deltas = t_deltas
+        self.pole_split = config['pole_split']
+        self.pole_folders = config['pole_folders']
+        self.agg_fact = config['agg_fact']
 
         # self.boundary_date = datetime(
         #     year=2021, month=1, day=1, hour=0, minute=0, second=0)
-        self.boundary_date = datetime(
-            year=2021, month=1, day=1, hour=0, minute=0, second=0)
+        self.boundary_date = config['struct_boundary_date']
 
     def gen_filename_list(self, start_time=None, end_time=None, file_format="%Y/%m/%d/CPPin%Y%m%d%H%M%S.nc", freq=timedelta(minutes=15), inclusive="both"):
         if start_time is None:
@@ -82,7 +83,7 @@ class MissingFilesSearcher:
         return filtered_first_dt_filenames
 
     def are_missing(self, filenames):
-        if len(filenames)!=0:
+        if len(filenames) != 0:
             vec_isfile = np.vectorize(os.path.isfile)
             file_exists_bool = vec_isfile(filenames)
             return np.invert(file_exists_bool)
@@ -112,7 +113,8 @@ class MissingFilesSearcher:
             CLAAS_FP_POLE, f"%Y/%m/%d/Agg_{self.agg_fact:02}_%Y%m%d%H%M%S.nc")
         resample_filenames = np.array(
             self.gen_filename_list(file_format=resampled_fp_format))
-        self.resample_ind = self.gen_resample_ind(self.filtered_file_missing_bool)
+        self.resample_ind = self.gen_resample_ind(
+            self.filtered_file_missing_bool)
         self.filenames_to_filter = resample_filenames[self.resample_ind]
 
     def gen_unpr_filenames_to_resample(self, CLAAS_FP_POLE):
@@ -125,7 +127,8 @@ class MissingFilesSearcher:
         ind_to_resample = self.are_missing(self.filenames_to_filter)
         if ind_to_resample is not None:
             self.agg_result_names = self.filenames_to_filter[ind_to_resample]
-            self.resample_result_names = np.char.replace(self.agg_result_names, f"Agg_{self.agg_fact:02}", "Agg_01")
+            self.resample_result_names = np.char.replace(
+                self.agg_result_names, f"Agg_{self.agg_fact:02}", "Agg_01")
             # print(ind_to_resample)
             if (self.start_time < self.boundary_date) & (self.end_time < self.boundary_date):
                 self.cpp_files_to_resample = np.array(self.gen_filename_list(
@@ -167,14 +170,15 @@ class MissingFilesSearcher:
                 CLAAS_FP_POLE = os.path.join(self.CLAAS_FP, pole)
                 self.gen_missing_filtered_filenames(
                     os.path.join(self.CLAAS_FP, "Filtered_Data", pole))
-                self.gen_filenames_to_filter(os.path.join(self.CLAAS_FP, "Resampled_Data", pole))
+                self.gen_filenames_to_filter(os.path.join(
+                    self.CLAAS_FP, "Resampled_Data", pole))
                 self.gen_unpr_filenames_to_resample(CLAAS_FP_POLE)
                 self.result_dict[pole]["resample_CPP"] = self.cpp_files_to_resample
                 self.result_dict[pole]["resample_CTX"] = self.ctx_files_to_resample
                 self.result_dict[pole]["resample_res"] = self.resample_result_names
                 self.result_dict[pole]["agg_res"] = self.agg_result_names
                 self.result_dict[pole]["filter"] = self.filenames_to_filter
-                
+
         else:
             self.result_dict = {"filter": None,
                                 "resample_CPP": None, "resample_CTX": None}
@@ -189,16 +193,24 @@ class MissingFilesSearcher:
 
     def gen_cloudtrack_filenames(self, job_output_folder):
         cloudtracks_fps = {}
-        folder_name=f"{self.start_time.srptime(folder_time_format)}_{self.end_time.srptime(folder_time_format)}"
-        filename_format="cloudtracks_%Y%m%d_%H%M%S.nc"
-        for temp_ind in range(len(self.temps_to_check[0])):
-            min_temp = self.temps_to_check[0][temp_ind]
-            max_temp = self.temps_to_check[1][temp_ind]
-            folder_time_format="%Y%m%d.%H%M"
+        folder_time_format = "%Y%m%d.%H%M"
+        folder_name = f"{self.start_time.strftime(folder_time_format)}_{self.end_time.strftime(folder_time_format)}"
+        filename_format = "cloudtracks_%Y%m%d_%H%M%S.nc"
+        for temp_ind in range(len(self.min_temp_arr)):
+            min_temp = abs(self.min_temp_arr[temp_ind])
+            max_temp = abs(self.max_temp_arr[temp_ind])
             cloudtracks_fp_format = os.path.join(
-                job_output_folder, f"Agg_{self.agg_fact:02}_T_{max_temp:02}_{min_temp:02}", "pixel_path_tracking", folder_name, filename_format)
-            cloudtracks_fps[f"{abs(min_temp)}_{abs(min_temp)}"] = np.array(self.gen_filename_list(file_format=cloudtracks_fp_format))
+                job_output_folder, f"Agg_{self.agg_fact:02}_T_{min_temp:02}_{max_temp:02}", "pixel_path_tracking", folder_name, filename_format)
+            cloudtracks_fps[f"{abs(min_temp)}_{abs(max_temp)}"] = np.array(
+                self.gen_filename_list(file_format=cloudtracks_fp_format))
+            stats_fp_format = os.path.join(
+                job_output_folder, f"Agg_{self.agg_fact:02}_T_{min_temp:02}_{max_temp:02}","stats")
+            cloudtracks_fps["trackstats"] = os.path.join(stats_fp_format,f"trackstats_{folder_name}.nc")
+            cloudtracks_fps["tracknumbers"] = os.path.join(stats_fp_format,f"tracknumbers_{folder_name}.nc")
+            cloudtracks_fps["trackstats_final"] = os.path.join(stats_fp_format,f"trackstats_final_{folder_name}.nc")
+            cloudtracks_fps["trackstats_sparce"] = os.path.join(stats_fp_format,f"trackstats_sparce_{folder_name}.nc")
         return cloudtracks_fps
+
 
 def check_existance_of_unpr_files(searcher):
     file_array_names = ["resample_CPP", "resample_CTX"]
@@ -217,8 +229,8 @@ def check_existance_of_unpr_files(searcher):
                 print(f"All {pole} {file_array_name} files are present")
 
 
-def generate_filename_dict(start_time, end_time, t_deltas, agg_fact):
-    searcher = MissingFilesSearcher(start_time, end_time, t_deltas, agg_fact)
+def generate_filename_dict():
+    searcher = MissingFilesSearcher(read_config())
     searcher.gen_target_filenames()
     check_existance_of_unpr_files(searcher)
     return searcher.result_dict

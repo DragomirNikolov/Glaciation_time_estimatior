@@ -19,7 +19,7 @@ import yaml
 import os
 import argparse
 from datetime import datetime
-
+from Glaciation_time_estimator.Auxiliary_func.config_reader import read_config
 
 def parse_cmd_args():
     # Retrieve cmd arguments
@@ -28,31 +28,21 @@ def parse_cmd_args():
     )
     parser.add_argument('-t', "--temperature_bounds", nargs=2,
                         help="Min temp and max temp of file for analysis", type=int, required=True)
-    parser.add_argument('-st', "--start_time",
-                        help="Start time in format YYYYMMDDHHMM", required=True)
-    parser.add_argument('-et', "--end_time",
-                        help="End time in format YYYYMMDDHHMM", required=True)
     parser.add_argument("-bc", "--base_configuration",
                         help="Base yaml config file on which to draw upon", required=True)
-    parser.add_argument('-af', "--aggregation_factor",
-                        help="Aggregation factor of file in use", type=int, required=True)
 
     # parser.add_argument("-wd", "--work_directory", help="Base yaml config file on which to draw upon", required=True)
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     # Put arguments in a dictionary
     args_dict = {
         'temp_bounds': args.temperature_bounds,
         'base_config': args.base_configuration,
-        'agg_fact': args.aggregation_factor,
-        'start_time':   datetime.strptime(args.start_time, "%Y%m%d%H%M"),
-        'end_time':   datetime.strptime(args.end_time, "%Y%m%d%H%M")
     }
-    assert args_dict["start_time"]<args_dict["end_time"],("End time shoule be after start time ")
     return args_dict
 
 
-def config_setup(work_dir: str, base_setup_contnet: list, arg_dict: dict) -> str:
+def config_setup(work_dir: str, base_setup_contnet: list, arg_dict: dict, config: dict) -> str:
     """
     Writes configuratuin file
 
@@ -67,9 +57,9 @@ def config_setup(work_dir: str, base_setup_contnet: list, arg_dict: dict) -> str
     """
     min_temp = abs(round(arg_dict['temp_bounds'][0]))
     max_temp = abs(round(arg_dict['temp_bounds'][1]))
-    start_time = arg_dict['start_time']
-    end_time = arg_dict['end_time']
-    agg_fact = arg_dict['agg_fact']
+    start_time = config['start_time']
+    end_time = config['end_time']
+    agg_fact = config['agg_fact']
     temp_setup = base_setup_contnet
 
     # Create root path
@@ -102,7 +92,7 @@ if __name__ == "__main__":
     if base_dir == "/":
         base_dir = "/cluster/work/climate/dnikolo/dump"
     arg_dict = parse_cmd_args()
-    print(base_dir)
+    config = read_config()
 
     with open(arg_dict['base_config'], 'r') as stream:
         try:
@@ -110,5 +100,4 @@ if __name__ == "__main__":
         except yaml.YAMLError as exc:
             print(exc)
             exit
-    print("The agg factor is: ", arg_dict['agg_fact'])
-    config_setup(base_dir, base_config_content, arg_dict)
+    config_setup(base_dir, base_config_content, arg_dict, config)

@@ -6,13 +6,14 @@ import subprocess
 import time
 import threading
 import argparse
-from Nestable_multiprocessing import NestablePool
+from Glaciation_time_estimator.Auxiliary_func.Nestable_multiprocessing import NestablePool
+from Glaciation_time_estimator.Auxiliary_func.config_reader import read_config
 from functools import partial
 from Resample_data import ProjectionTransformer
 from Temp_filter import TempFilter
 from File_name_generator import generate_filename_dict
 from Output_file_generation import OutputFilteredFile, OutputResampledFile
-import subprocess
+
 global CLAAS_FP
 CLAAS_FP = os.environ["CLAAS_DIR"]
 if CLAAS_FP == "":
@@ -118,21 +119,22 @@ def resampling_worker(folder_fp_ind, aux_data, agg_fact, folder_fps_CTX, folder_
     print(
         f"Aggregated day {folder_fp_ind} in {round(agg_end_time - resample_end_time,2)}s")
 
-def resample_pole(pole, target_filenames, aux_fps,agg_fact, n_workers):
+
+def resample_pole(pole, target_filenames, aux_fps, agg_fact, n_workers):
     transformer = ProjectionTransformer()
     aux_data = xr.load_dataset(os.path.join(
-    CLAAS_FP, aux_fps[pole]), decode_times=False)
+        CLAAS_FP, aux_fps[pole]), decode_times=False)
     transformer.generate_lat_lon_prj(aux_data)
     folder_fps_CTX = fps_by_folder(target_filenames[pole]["resample_CTX"])
     folder_fps_CPP = fps_by_folder(target_filenames[pole]["resample_CPP"])
     folder_resample_res_fps = fps_by_folder(
-    target_filenames[pole]["resample_res"])
+        target_filenames[pole]["resample_res"])
     folder_agg_res_fps = fps_by_folder(
-    target_filenames[pole]["agg_res"])
+        target_filenames[pole]["agg_res"])
     pole_pool = NestablePool(n_workers)
     par_worker = partial(resampling_worker, aux_data=aux_data, agg_fact=agg_fact, folder_fps_CTX=folder_fps_CTX, folder_fps_CPP=folder_fps_CPP,
-                             folder_resample_res_fps=folder_resample_res_fps, folder_agg_res_fps=folder_agg_res_fps, transformer=transformer)
-    ind_to_iterate=range(len(folder_fps_CTX))
+                         folder_resample_res_fps=folder_resample_res_fps, folder_agg_res_fps=folder_agg_res_fps, transformer=transformer)
+    ind_to_iterate = range(len(folder_fps_CTX))
     pole_pool.map(par_worker, ind_to_iterate)
     pole_pool.close()
     aux_data.close()
@@ -144,7 +146,8 @@ def generate_resampled_output(target_filenames, agg_fact, n_tot_workers=6):
                "sp": "/wolke_scratch/dnikolo/CLAAS_Data/sp/CM_SAF_CLAAS3_L2_AUX.nc"}
     start_time = time.time()
     pool = NestablePool(len(pole_folders))
-    part_resample_pole_fun = partial(resample_pole,target_filenames = target_filenames, aux_fps=aux_fps,agg_fact=agg_fact, n_workers= int(n_tot_workers/len(pole_folders)))
+    part_resample_pole_fun = partial(resample_pole, target_filenames=target_filenames,
+                                     aux_fps=aux_fps, agg_fact=agg_fact, n_workers=int(n_tot_workers/len(pole_folders)))
     pool.map(part_resample_pole_fun, pole_folders)
     pool.close()
     end_time = time.time()
@@ -194,36 +197,38 @@ def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=8):
         # print(len(folder_fps_CPP[folder_fp_ind]))dataset(dataset_list, list(output_fps))
 
 
-def parse_cmd_args():
-    # Retrieve cmd arguments
-    parser = argparse.ArgumentParser(
-        description="Create a custom PyFLEXTRKR config file from terminal."
-    )
-    parser.add_argument('-st', "--start_time",
-                        help="Start time in format YYYYMMDDHHMM", default="202301160000")
-    parser.add_argument('-et', "--end_time",
-                        help="End time in format YYYYMMDDHHMM", default="202301312345")
-    parser.add_argument('-af', "--aggregation_factor",
-                        help="Aggregation factor of file in use", type=int, default=3)
+# def parse_cmd_args():
+#     # Retrieve cmd arguments
+#     parser = argparse.ArgumentParser(
+#         description="Create a custom PyFLEXTRKR config file from terminal."
+#     )
+#     parser.add_argument('-st', "--start_time",
+#                         help="Start time in format YYYYMMDDHHMM", default="202301160000")
+#     parser.add_argument('-et', "--end_time",
+#                         help="End time in format YYYYMMDDHHMM", default="202301312345")
+#     parser.add_argument('-af', "--aggregation_factor",
+#                         help="Aggregation factor of file in use", type=int, default=3)
 
-    # parser.add_argument("-wd", "--work_directory", help="Base yaml config file on which to draw upon", required=True)
-    args = parser.parse_args()
+#     # parser.add_argument("-wd", "--work_directory", help="Base yaml config file on which to draw upon", required=True)
+#     args = parser.parse_args()
 
-    # Put arguments in a dictionary
-    args_dict = {
-        'agg_fact': args.aggregation_factor,
-        'start_time':   datetime.strptime(args.start_time, "%Y%m%d%H%M"),
-        'end_time':   datetime.strptime(args.end_time, "%Y%m%d%H%M")
-    }
-    assert args_dict["start_time"] < args_dict["end_time"], (
-        "End time shoule be after start time ")
-    return args_dict
+#     # Put arguments in a dictionary
+#     args_dict = {
+#         'agg_fact': args.aggregation_factor,
+#         'start_time':   datetime.strptime(args.start_time, "%Y%m%d%H%M"),
+#         'end_time':   datetime.strptime(args.end_time, "%Y%m%d%H%M")
+#     }
+#     assert args_dict["start_time"] < args_dict["end_time"], (
+#         "End time shoule be after start time ")
+#     return args_dict
 
 
 if __name__ == "__main__":
     print("Generating target filenames")
-    t_deltas = [5]
-    args_dict = parse_cmd_args()
+    
+    args_dict = read_config()
+    t_deltas = args_dict["t_deltas"]
+    # args_dict = parse_cmd_args()
     print(args_dict['start_time'],
           args_dict['end_time'], args_dict['agg_fact'])
     target_filenames = generate_filename_dict(
