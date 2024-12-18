@@ -48,6 +48,7 @@ class MissingFilesSearcher:
         # self.boundary_date = datetime(
         #     year=2021, month=1, day=1, hour=0, minute=0, second=0)
         self.boundary_date = config['struct_boundary_date']
+        self.config = config
 
     def gen_filename_list(self, start_time=None, end_time=None, file_format="%Y/%m/%d/CPPin%Y%m%d%H%M%S.nc", freq=timedelta(minutes=15), inclusive="both"):
         if start_time is None:
@@ -193,22 +194,23 @@ class MissingFilesSearcher:
 
     def gen_cloudtrack_filenames(self, job_output_folder):
         cloudtracks_fps = {}
-        folder_time_format = "%Y%m%d.%H%M"
-        folder_name = f"{self.start_time.strftime(folder_time_format)}_{self.end_time.strftime(folder_time_format)}"
+        folder_name = self.config["time_folder_name"]
         filename_format = "cloudtracks_%Y%m%d_%H%M%S.nc"
         for temp_ind in range(len(self.min_temp_arr)):
             min_temp = abs(self.min_temp_arr[temp_ind])
             max_temp = abs(self.max_temp_arr[temp_ind])
             cloudtracks_fp_format = os.path.join(
-                job_output_folder, f"Agg_{self.agg_fact:02}_T_{min_temp:02}_{max_temp:02}", "pixel_path_tracking", folder_name, filename_format)
-            cloudtracks_fps[f"{abs(min_temp)}_{abs(max_temp)}"] = np.array(
+                job_output_folder, f"Agg_{self.agg_fact:02}_T_{min_temp:02}_{max_temp:02}",folder_name, "pixel_path_tracking",folder_name, filename_format)
+            key=f"{abs(min_temp)}_{abs(max_temp)}"
+            cloudtracks_fps[key]={}
+            cloudtracks_fps[key]["cloudtracks"] = np.array(
                 self.gen_filename_list(file_format=cloudtracks_fp_format))
             stats_fp_format = os.path.join(
-                job_output_folder, f"Agg_{self.agg_fact:02}_T_{min_temp:02}_{max_temp:02}","stats")
-            cloudtracks_fps["trackstats"] = os.path.join(stats_fp_format,f"trackstats_{folder_name}.nc")
-            cloudtracks_fps["tracknumbers"] = os.path.join(stats_fp_format,f"tracknumbers_{folder_name}.nc")
-            cloudtracks_fps["trackstats_final"] = os.path.join(stats_fp_format,f"trackstats_final_{folder_name}.nc")
-            cloudtracks_fps["trackstats_sparce"] = os.path.join(stats_fp_format,f"trackstats_sparce_{folder_name}.nc")
+                job_output_folder, f"Agg_{self.agg_fact:02}_T_{min_temp:02}_{max_temp:02}",folder_name, "stats")
+            cloudtracks_fps[key]["trackstats"] = os.path.join(stats_fp_format,f"trackstats_{folder_name}.nc")
+            cloudtracks_fps[key]["tracknumbers"] = os.path.join(stats_fp_format,f"tracknumbers_{folder_name}.nc")
+            cloudtracks_fps[key]["trackstats_final"] = os.path.join(stats_fp_format,f"trackstats_final_{folder_name}.nc")
+            cloudtracks_fps[key]["trackstats_sparce"] = os.path.join(stats_fp_format,f"trackstats_sparce_{folder_name}.nc")
         return cloudtracks_fps
 
 

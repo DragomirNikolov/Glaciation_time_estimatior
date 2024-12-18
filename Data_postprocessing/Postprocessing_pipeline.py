@@ -1,14 +1,15 @@
 import numpy as np
 import xarray as xr
 import numba as nb
+import pandas as pd
 from datetime import datetime
-from Single_cloud_analysis import Cloud
 from Glaciation_time_estimator.Auxiliary_func.config_reader import read_config
+from Glaciation_time_estimator.Data_postprocessing.Single_cloud_analysis import Cloud
 from Glaciation_time_estimator.Data_postprocessing.Job_result_fp_generator import generate_tracking_filenames
 from multiprocessing import Manager
 from Glaciation_time_estimator.Auxiliary_func.Nestable_multiprocessing import NestablePool
 from functools import partial
-
+import os
 
 @nb.njit
 def extract_cloud_coordinates(cloudtracknumber_field, cloud_id_in_field, max_size):
@@ -32,24 +33,95 @@ def extract_cloud_coordinates(cloudtracknumber_field, cloud_id_in_field, max_siz
     # return loc_hash_map_cloud_numbers
 
 
+def extract_value(val):
+    if isinstance(val, xr.DataArray):
+        return val.values.item() if val.size == 1 else val.values
+    return val
+
+
+def save_single_temp_range_results(cloud_arr, pole, min_temp, max_temp, config):
+    columns = ["is_liq", "is_mix", "is_ice", "max_water_frac",
+               "max_ice_fraction", "avg_size[km]", "max_size[km]",
+               "min_size[km]", "avg_size[px]", "max_size[px]",
+               "min_size[px]", "track_start_time", "track_length",
+               "glaciation_start_time", "glaciation_end_time", "avg_lat",
+               "avg_lon", "start_ice_fraction", "end_ice_fraction",
+               "ice_frac_hist", "lat_hist", "lon_hist",
+               "size_hist_km"]
+    datapoints_per_cloud = len(columns)
+    cloudinfo_df = pd.DataFrame(
+        index=range(len(cloud_arr)), columns=columns)
+    for cloud_ind in range(len(cloud_arr)):
+        current_cloud = cloud_arr[cloud_ind]
+        if current_cloud is not None:
+            cloudinfo_df.iloc[cloud_ind] = [
+                current_cloud.is_liq,
+                current_cloud.is_mix,
+                current_cloud.is_ice,
+                current_cloud.max_water_fraction,
+                current_cloud.max_ice_fraction,
+                extract_value(current_cloud.avg_cloud_size_km),
+                extract_value(current_cloud.max_size_km),
+                extract_value(current_cloud.min_size_km),
+                extract_value(current_cloud.avg_cloud_size_px),
+                extract_value(current_cloud.max_size_px),
+                extract_value(current_cloud.min_size_px),
+                current_cloud.track_start_time,
+                current_cloud.track_length,
+                current_cloud.glaciation_start_time,
+                current_cloud.glaciation_end_time,
+                extract_value(current_cloud.avg_cloud_lat),
+                extract_value(current_cloud.avg_cloud_lon),
+                current_cloud.start_ice_fraction_arr,
+                current_cloud.end_ice_fraction_arr,
+                current_cloud.ice_fraction_list,
+                current_cloud.lat_list,
+                current_cloud.lon_list,
+                current_cloud.cloud_size_km_list
+            ]
+
+    # Ensure output directory exists
+    output_dir = os.path.join(
+        config['postprocessing_output_dir'],pole,
+        config['time_folder_name'],
+        f"Agg_{config['agg_fact']:02}_T_{abs(round(min_temp)):02}_{abs(round(max_temp)):02}"
+    )
+    os.makedirs(os.path.dirname(output_dir), exist_ok=True)
+
+    # Save DataFrame to Parquet
+    output_dir_parq = output_dir + ".parquet"
+    print("Writing to ", output_dir_parq)
+    cloudinfo_df.to_parquet(output_dir_parq)
+
+    # Optionally save as CSV
+    if config['write_csv']:
+        output_dir_csv = output_dir + ".csv"
+        cloudinfo_df.to_csv(output_dir_csv)
+
+
 def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps, pole: str, config: dict) -> None:
     # loop_start_time=dt.datetime.now()
-    min_temp, max_temp = config['min_temp_array'][temp_ind], config['max_temp_array'][temp_ind]
+    min_temp, max_temp = config['min_temp_arr'][temp_ind], config['max_temp_arr'][temp_ind]
     # Load datasets
-    temp_key = f'{abs(round(min_temp))}-{abs(round(max_temp))}'
+    temp_key = f'{abs(round(min_temp))}_{abs(round(max_temp))}'
+    print(f"Analyzing {pole} {temp_key}")
+    # print(tracking_fps[pole][temp_key]["cloudtracks"][0])
+    # print(tracking_fps[pole][temp_key]["trackstats_final"])
+    # print(tracking_fps[pole][temp_key]["tracknumbers"])
     try:
-        # current_iteration_dir = job_output_dir
-        cloudtrack_data = xr.load_dataset(tracking_fps[pole][temp_key][0])
+        cloudtrack_data = xr.load_dataset(
+            tracking_fps[pole][temp_key]["cloudtracks"][0])
         trackstats_data = xr.load_dataset(
-            tracking_fps[pole]["trackstats_final"])
-        tracknumbers_data = xr.load_dataset(tracking_fps[pole]["tracknumbers"])
+            tracking_fps[pole][temp_key]["trackstats_final"])
+        tracknumbers_data = xr.load_dataset(
+            tracking_fps[pole][temp_key]["tracknumbers"])
     except:  # Exception as inst:
-        print(f"Skipping {min_temp} to {max_temp}")
+        print(f"Skipping {pole} {min_temp} to {max_temp}")
         cloud_dict[temp_key] = np.array([])
         return None
     # Load relevant data from datasets into local variables
     n_tracks = trackstats_data.variables['track_duration'].shape[0]
-    basetimes = tracknumbers_data['basetimes']
+    basetimes = pd.to_datetime(tracknumbers_data['basetimes'])
     lat = cloudtrack_data['lat']
     lon = cloudtrack_data['lon']
     lat_resolution = (lat.max()-lat.min())/len(lat)
@@ -61,16 +133,17 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps, pole: str
     cloud_arr = np.empty((n_tracks), dtype=Cloud)
     # Cloud(f'{temp_ind}_{i}') for i in range(n_tracks)])
     # print(append_end_time-append_start_time)
-    print(f'Analyzing T: {min_temp} to {max_temp} Agg={config['agg_fact']}')
-
+    # print(f"Analyzing T: {min_temp} to {max_temp} Agg={config['agg_fact']}")
     for fp_ind in range(len(basetimes)):
-        time = datetime.utcfromtimestamp(basetimes[fp_ind])
+        time = basetimes[fp_ind]
         time_str = time.strftime("%Y%m%d_%H%M%S")
-        print(f'{min_temp} to {max_temp} Loading {time_str}')
-        cloudtrack_fp = tracking_fps[pole]['cloudtracks'][fp_ind]
+        # print(f'{min_temp} to {max_temp} Loading {time_str}')
+        cloudtrack_fp = tracking_fps[pole][temp_key]['cloudtracks'][fp_ind]
         cloudtrack_data = xr.load_dataset(cloudtrack_fp)
         cloudtracknumber_field = cloudtrack_data['tracknumber'].data
-        cph_field = cloudtrack_data['cph']
+        cloudtracknumber_field[np.isnan(cloudtracknumber_field)] = 0
+        cloudtracknumber_field = cloudtracknumber_field.astype(int)
+        cph_field = cloudtrack_data['cph_filtered']
         cloud_id_in_field, counts = np.unique(
             cloudtracknumber_field, return_counts=True)
         counts = counts[cloud_id_in_field != 0]
@@ -82,6 +155,7 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps, pole: str
         cloudtrack_data.close()
         if max_allowed_cloud_size_px > 1000000:
             print(np.where(counts, counts == counts.max()))
+        # print(cloud_id_in_field)
         for track_number in cloud_id_in_field:
             try:
                 if cloud_arr[track_number-1] is None:
@@ -99,22 +173,99 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps, pole: str
                     avg_lat_ind = int(round(np.mean(cloud_location_ind[0])))
                     avg_lon_ind = int(round(np.mean(cloud_location_ind[1])))
                     # TODO:SPEED UP NEXT TWO LINES (set_cloud_values and update_status)
-                    cloud_values = cph_field[0,
-                                             cloud_location_ind[0].T, cloud_location_ind[1].T]
+                    cloud_values = cph_field.values[0,
+                                                    cloud_location_ind[0].T, cloud_location_ind[1].T]
                     cloud_arr[track_number-1].update_status(
-                        time, cloud_values, lat[avg_lat_ind], lon[avg_lon_ind], lat_resolution, lon_resolution)
+                        time, cloud_values, extract_value(lat[avg_lat_ind]), extract_value(lon[avg_lon_ind]), lat_resolution.values, lon_resolution.values)
                 else:
                     cloud_arr[track_number-1].update_missing_cloud()
-    cloud_dict[temp_key] = cloud_arr
-# def analyze_basetime():
+    save_single_temp_range_results(cloud_arr, pole, min_temp, max_temp, config)
 
 
-def analize_single_pole(pole, cloud_dict, tracking_fps, config, n_procs=4):
+def analize_single_pole(pole, cloud_dict, tracking_fps, config, n_procs=1):
+    print(f"Analyzing {pole}")
     with NestablePool(n_procs) as pool:
         part_single_temp_range = partial(
             analize_single_temp_range, cloud_dict=cloud_dict, tracking_fps=tracking_fps, pole=pole, config=config)
-        pool.map(part_single_temp_range, range(len(config['min_temp_array'])))
+        pool.map(part_single_temp_range, range(len(config['min_temp_arr'])))
         pool.close()
+
+
+def save_results(res_dict, config):
+    min_temp, max_temp = config['min_temp_arr'][0], config['max_temp_arr'][0]
+    temp_key = f'{abs(round(min_temp))}_{abs(round(max_temp))}'
+    # cloudtrack_data = xr.(
+    #     tracking_fps['np'][temp_key]["cloudtracks"][0])
+    # lat = cloudtrack_data['lat']
+    # lon = cloudtrack_data['lon']
+    # lat_resolution = extract_value((lat.max()-lat.min())/len(lat))
+    # lon_resolution = extract_value((lon.max()-lon.min())/len(lon))
+    # cloudtrack_data.close()
+    columns = ["is_liq", "is_mix", "is_ice", "max_water_frac",
+               "max_ice_fraction", "avg_size[km]", "max_size[km]",
+               "min_size[km]", "avg_size[px]", "max_size[px]",
+               "min_size[px]", "track_start_time", "track_length",
+               "glaciation_start_time", "glaciation_end_time", "avg_lat",
+               "avg_lon", "start_ice_fraction", "end_ice_fraction",
+               "ice_frac_hist", "lat_hist", "lon_hist",
+               "size_hist_km"]
+    datapoints_per_cloud = len(columns)
+    # Iterating through the cloud data
+    for temp_ind in range(len(config['max_temp_arr'])):
+        for pole in config['pole_folders']:
+            min_temp, max_temp = config['min_temp_arr'][temp_ind], config['max_temp_arr'][temp_ind]
+            temp_key = f'{abs(round(min_temp))}_{abs(round(max_temp))}'
+            key = f'{pole}_{temp_key}'
+            cloud_arr = res_dict[key]
+
+            cloudinfo_df = pd.DataFrame(
+                index=range(len(cloud_arr)), columns=columns)
+            for cloud_ind in range(len(cloud_arr)):
+                current_cloud = cloud_arr[cloud_ind]
+                if current_cloud is not None:
+                    cloudinfo_df.iloc[cloud_ind] = [
+                        current_cloud.is_liq,
+                        current_cloud.is_mix,
+                        current_cloud.is_ice,
+                        current_cloud.max_water_fraction,
+                        current_cloud.max_ice_fraction,
+                        extract_value(current_cloud.avg_cloud_size_km),
+                        extract_value(current_cloud.max_size_km),
+                        extract_value(current_cloud.min_size_km),
+                        extract_value(current_cloud.avg_cloud_size_px),
+                        extract_value(current_cloud.max_size_px),
+                        extract_value(current_cloud.min_size_px),
+                        current_cloud.track_start_time,
+                        current_cloud.track_length,
+                        current_cloud.glaciation_start_time,
+                        current_cloud.glaciation_end_time,
+                        extract_value(current_cloud.avg_cloud_lat),
+                        extract_value(current_cloud.avg_cloud_lon),
+                        current_cloud.start_ice_fraction_arr,
+                        current_cloud.end_ice_fraction_arr,
+                        current_cloud.ice_fraction_list,
+                        current_cloud.lat_list,
+                        current_cloud.lon_list,
+                        current_cloud.cloud_size_km_list
+                    ]
+
+            # Ensure output directory exists
+            output_dir = os.path.join(
+                config['postprocessing_output_dir'],
+                config['time_folder_name'],
+                f"T_{abs(round(min_temp)):02}_{abs(round(max_temp)):02}_agg_{config['agg_fact']:02}"
+            )
+            os.makedirs(os.path.dirname(output_dir), exist_ok=True)
+
+            # Save DataFrame to Parquet
+            output_dir_parq = output_dir + ".parquet"
+            print("Writing to ", output_dir_parq)
+            cloudinfo_df.to_parquet(output_dir_parq)
+
+            # Optionally save as CSV
+            if config['write_csv']:
+                output_dir_csv = output_dir + ".csv"
+                cloudinfo_df.to_csv(output_dir_csv)
 
 
 if __name__ == "__main__":
@@ -128,5 +279,5 @@ if __name__ == "__main__":
         with NestablePool(2) as pool:
             pool.map(part_analize_single_pole, config['pole_folders'])
             pool.close()
-        print(cloud_dict["5_0"])
-        #TODO: Saving
+    # save_results(cloud_dict, config)
+        # TODO: Saving

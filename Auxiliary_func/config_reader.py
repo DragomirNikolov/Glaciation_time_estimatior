@@ -31,11 +31,13 @@ def format_config(config):
     min_temp_arr, max_temp_arr = generate_temp_range(config["t_deltas"])
     config["min_temp_arr"] = min_temp_arr
     config["max_temp_arr"] = max_temp_arr
+    config["time_folder_name"] = f"{config['start_time'].strftime(config['time_folder_format'])}_{config['end_time'].strftime(config['time_folder_format'])}"
     return config
 
 
-def read_config():
-    config_fp = parse_cmd_args()
+def read_config(config_fp = None):
+    if config_fp is None:
+        config_fp = parse_cmd_args()
     with open(config_fp) as stream:
         try:
             config = yaml.safe_load(stream)
