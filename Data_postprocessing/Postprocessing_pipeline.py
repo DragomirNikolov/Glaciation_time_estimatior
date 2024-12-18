@@ -147,6 +147,8 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps, pole: str
         cloud_id_in_field, counts = np.unique(
             cloudtracknumber_field, return_counts=True)
         counts = counts[cloud_id_in_field != 0]
+        if len(counts) == 0:
+            continue
         cloud_id_in_field = cloud_id_in_field[cloud_id_in_field != 0]
         max_allowed_cloud_size_px = config['fast_mode_arr_size'] if config['postprocessing_fast_mode'] else counts.max(
         )
@@ -279,5 +281,3 @@ if __name__ == "__main__":
         with NestablePool(2) as pool:
             pool.map(part_analize_single_pole, config['pole_folders'])
             pool.close()
-    # save_results(cloud_dict, config)
-        # TODO: Saving
