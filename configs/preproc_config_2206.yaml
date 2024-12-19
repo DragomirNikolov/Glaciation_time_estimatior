@@ -1,5 +1,5 @@
-start_time: "20230600_0000"
-end_time: "20230630_2345"
+start_time: "20220601_0000"
+end_time: "20220630_2345"
 
 pole_split: True
 struct_boundary_date: "20210101_0000"
@@ -11,7 +11,7 @@ aux_fps:
     "sp": "/wolke_scratch/dnikolo/CLAAS_Data/sp/CM_SAF_CLAAS3_L2_AUX.nc",
   }
 #Leave empy if no name
-CLAAS_fp: "/wolke_scratch/dnikolo/CLAAS_Data"
+CLAAS_fp: "n2o:/wolke_scratch/dnikolo/CLAAS_Data"
 job_output_fp: "/cluster/work/climate/dnikolo/Job_output/"
 
 agg_fact: 3
