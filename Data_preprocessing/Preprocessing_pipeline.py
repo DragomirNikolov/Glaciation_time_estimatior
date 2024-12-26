@@ -9,10 +9,10 @@ import argparse
 from Glaciation_time_estimator.Auxiliary_func.Nestable_multiprocessing import NestablePool
 from Glaciation_time_estimator.Auxiliary_func.config_reader import read_config
 from functools import partial
-from Resample_data import ProjectionTransformer
-from Temp_filter import TempFilter
-from File_name_generator import generate_filename_dict
-from Output_file_generation import OutputFilteredFile, OutputResampledFile
+from Glaciation_time_estimator.Data_preprocessing.Resample_data import ProjectionTransformer
+from Glaciation_time_estimator.Data_preprocessing.Temp_filter import TempFilter
+from Glaciation_time_estimator.Data_preprocessing.File_name_generator import generate_filename_dict
+from Glaciation_time_estimator.Data_preprocessing.Output_file_generation import OutputFilteredFile, OutputResampledFile
 
 global CLAAS_FP
 CLAAS_FP = os.environ["CLAAS_DIR"]
@@ -140,7 +140,7 @@ def resample_pole(pole, target_filenames, aux_fps, agg_fact, n_workers):
     aux_data.close()
 
 
-def generate_resampled_output(target_filenames, agg_fact, n_tot_workers=6):
+def generate_resampled_output(target_filenames, agg_fact, n_tot_workers=4):
     pole_folders = ["np", "sp"]
     aux_fps = {"np": "/wolke_scratch/dnikolo/CLAAS_Data/np/CM_SAF_CLAAS3_L2_AUX.nc",
                "sp": "/wolke_scratch/dnikolo/CLAAS_Data/sp/CM_SAF_CLAAS3_L2_AUX.nc"}
@@ -231,8 +231,7 @@ if __name__ == "__main__":
     # args_dict = parse_cmd_args()
     print(args_dict['start_time'],
           args_dict['end_time'], args_dict['agg_fact'])
-    target_filenames = generate_filename_dict(
-        start_time=args_dict['start_time'], end_time=args_dict['end_time'], t_deltas=t_deltas, agg_fact=args_dict['agg_fact'])
+    target_filenames = generate_filename_dict()
     # print(target_filenames)
     print("Target filenames generated")
     print("Resampling needed files")
