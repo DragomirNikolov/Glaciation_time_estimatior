@@ -1,5 +1,6 @@
 Add config_file
 
+Add reference for peak identification
 update setup.py link
 Make whole program a package
 put parse_cmd_args in helper function 
