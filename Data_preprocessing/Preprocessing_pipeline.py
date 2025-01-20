@@ -151,10 +151,11 @@ def resample_pole(pole, target_filenames, aux_fps, agg_fact, n_workers):
     elif n_workers==1:
         for ind in ind_to_iterate:
             par_worker(ind)
+    
     aux_data.close()
 
 
-def generate_resampled_output(target_filenames, agg_fact, n_tot_workers=2):
+def generate_resampled_output(target_filenames, agg_fact, n_tot_workers=6):
     pole_folders = ["np", "sp"]
     aux_fps = {"np": "/wolke_scratch/dnikolo/CLAAS_Data/np/CM_SAF_CLAAS3_L2_AUX.nc",
                "sp": "/wolke_scratch/dnikolo/CLAAS_Data/sp/CM_SAF_CLAAS3_L2_AUX.nc"}
@@ -195,7 +196,7 @@ def filtering_worker(day_fp_to_filter, temp_bounds, agg_fact):
         xr.save_mfdataset(dataset_list, list(output_fps))
 
 
-def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=4):
+def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=8):
     pole_folders = ["np", "sp"]
     temp_bounds = generate_temp_range(t_deltas)
     for pole in pole_folders:
