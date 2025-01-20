@@ -1,18 +1,16 @@
 import os
 import xarray as xr
-from datetime import datetime
 import numpy as np
 import subprocess
 import time
 import threading
-import argparse
 from Glaciation_time_estimator.Auxiliary_func.Nestable_multiprocessing import NestablePool
 from Glaciation_time_estimator.Auxiliary_func.config_reader import read_config
 from functools import partial
 from Glaciation_time_estimator.Data_preprocessing.Resample_data import ProjectionTransformer
 from Glaciation_time_estimator.Data_preprocessing.Temp_filter import TempFilter
 from Glaciation_time_estimator.Data_preprocessing.File_name_generator import generate_filename_dict
-from Glaciation_time_estimator.Data_preprocessing.Output_file_generation import OutputFilteredFile, OutputResampledFile
+from Glaciation_time_estimator.Data_preprocessing.Output_file_generation import OutputNonResampledFile, OutputResampledFile
 
 global CLAAS_FP
 CLAAS_FP = os.environ["CLAAS_DIR"]
@@ -77,34 +75,46 @@ def aggregation(resample_res_fps, agg_res_fps, agg_fact):
         T.join()
 
 
-def resampling_worker(folder_fp_ind, aux_data, agg_fact, folder_fps_CTX, folder_fps_CPP, folder_resample_res_fps, folder_agg_res_fps, transformer):
+def resampling_worker(folder_fp_ind, aux_data, agg_fact, folder_fps_CTX, folder_fps_CPP, folder_resample_res_fps, folder_agg_res_fps, transformer, do_resampling=False):
     day_start_time = time.time()
     # Open relevant datasets
     # print(len(folder_fps_CTX[folder_fp_ind]))
     # print(len(folder_fps_CPP[folder_fp_ind]))
-    input_ctx_ds = xr.open_mfdataset(
-        list(folder_fps_CTX[folder_fp_ind]), parallel=True, chunks={"time": len(folder_fps_CTX[folder_fp_ind]), "x": aux_data.sizes["x"], "y": aux_data.sizes["y"]})
     input_cpp_ds = xr.open_mfdataset(
         list(folder_fps_CPP[folder_fp_ind]), parallel=True, chunks={"time": len(folder_fps_CPP[folder_fp_ind]), "x": aux_data.sizes["x"], "y": aux_data.sizes["y"]})
-
-    output_file = OutputResampledFile(
-        input_cpp_ds, agg_fact=1)
+    input_ctx_ds = xr.open_mfdataset(
+        list(folder_fps_CTX[folder_fp_ind]), parallel=True, chunks={"time": len(folder_fps_CTX[folder_fp_ind]), "x": aux_data.sizes["x"], "y": aux_data.sizes["y"]})
+ 
+    if do_resampling:
+        output_file = OutputResampledFile(
+            input_cpp_ds, agg_fact=1)
+    else:
+        output_file = OutputNonResampledFile(
+            input_cpp_ds,input_ctx_ds, agg_fact=1)
+    #Add coordinate variables to the output file
     output_file.add_coords(transformer.new_cord_lat,
                            transformer.new_cord_lon)
+    
     # Resample cpx dataset contents
-    resampled_ctt_data = transformer.remap_data(
-        input_ctx_ds["ctt"])
-    resampled_cth_data = transformer.remap_data(
-        input_ctx_ds["cth"])
-    output_file.set_ctx_output_variables(
-        resampled_ctt_data, resampled_cth_data)
+    if do_resampling:
+        resampled_ctt_data = transformer.remap_data(
+            input_ctx_ds["ctt"])
+        resampled_cth_data = transformer.remap_data(
+            input_ctx_ds["cth"])
+        output_file.set_ctx_output_variables(resampled_ctt_data,resampled_cth_data)
+    else:
+        output_file.set_ctx_output_variables()
     # del resampled_ctt_data, resampled_cth_data
     input_ctx_ds.close()
+
     # Resample cpp dataset contents
-    resampled_cph_data = transformer.remap_data(
-        input_cpp_ds["cph"])
-    output_file.set_cpp_output_variables(
-        resampled_cph_data)
+    if do_resampling:
+        resampled_cph_data = transformer.remap_data(
+            input_cpp_ds["cph"])
+        output_file.set_cpp_output_variables(
+            resampled_cph_data)
+    else:
+        output_file.set_cpp_output_variables()
     # Generate output file and save result
     resample_res_fps = folder_resample_res_fps[folder_fp_ind]
     agg_res_fps = folder_agg_res_fps[folder_fp_ind]
@@ -131,16 +141,20 @@ def resample_pole(pole, target_filenames, aux_fps, agg_fact, n_workers):
         target_filenames[pole]["resample_res"])
     folder_agg_res_fps = fps_by_folder(
         target_filenames[pole]["agg_res"])
-    pole_pool = NestablePool(n_workers)
     par_worker = partial(resampling_worker, aux_data=aux_data, agg_fact=agg_fact, folder_fps_CTX=folder_fps_CTX, folder_fps_CPP=folder_fps_CPP,
-                         folder_resample_res_fps=folder_resample_res_fps, folder_agg_res_fps=folder_agg_res_fps, transformer=transformer)
+                            folder_resample_res_fps=folder_resample_res_fps, folder_agg_res_fps=folder_agg_res_fps, transformer=transformer)
     ind_to_iterate = range(len(folder_fps_CTX))
-    pole_pool.map(par_worker, ind_to_iterate)
-    pole_pool.close()
+    if n_workers>1:
+        pole_pool = NestablePool(n_workers)
+        pole_pool.map(par_worker, ind_to_iterate)
+        pole_pool.close()
+    elif n_workers==1:
+        for ind in ind_to_iterate:
+            par_worker(ind)
     aux_data.close()
 
 
-def generate_resampled_output(target_filenames, agg_fact, n_tot_workers=4):
+def generate_resampled_output(target_filenames, agg_fact, n_tot_workers=2):
     pole_folders = ["np", "sp"]
     aux_fps = {"np": "/wolke_scratch/dnikolo/CLAAS_Data/np/CM_SAF_CLAAS3_L2_AUX.nc",
                "sp": "/wolke_scratch/dnikolo/CLAAS_Data/sp/CM_SAF_CLAAS3_L2_AUX.nc"}
@@ -181,7 +195,7 @@ def filtering_worker(day_fp_to_filter, temp_bounds, agg_fact):
         xr.save_mfdataset(dataset_list, list(output_fps))
 
 
-def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=8):
+def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=4):
     pole_folders = ["np", "sp"]
     temp_bounds = generate_temp_range(t_deltas)
     for pole in pole_folders:
