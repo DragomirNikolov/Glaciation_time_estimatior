@@ -24,3 +24,4 @@ write_csv: True
 #Folder for postprocessing
 postprocessing_output_dir: /cluster/work/climate/dnikolo/Cloud_analysis/
 time_folder_format: "%Y%m%d.%H%M"
+
