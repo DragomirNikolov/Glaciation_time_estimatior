@@ -1,6 +1,6 @@
 start_time: "20230108_0000"
 end_time: "20230115_2345"
-
+Resample: False
 pole_split: True
 struct_boundary_date: "20210101_0000"
 pole_folders: ["np", "sp"]
