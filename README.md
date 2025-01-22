@@ -1,6 +1,6 @@
 # Glaciation Time Estimator
 
-**Glaciation Time Estimator (GTE)** is a climate data analysis tool used to measure cloud glaciation time (CGT) in stratiform clouds using SEVIRI satellite data. The process is divided into the following steps:
+**Glaciation Time Estimator (GTE)** is a climate data analysis tool used to measure cloud glaciation time (CGT) in stratiform clouds. It analyses the CLAAS-3 dataset based on Meteosat Second Generaion satellite data. The processing is divided into the following steps:
 
 1. **Preprocessing**  
    - Resampling is performed to convert geostationary data to a regular latitude/longitude reference frame.  
