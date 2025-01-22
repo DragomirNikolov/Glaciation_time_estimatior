@@ -11,6 +11,7 @@ from Glaciation_time_estimator.Auxiliary_func.Nestable_multiprocessing import Ne
 from functools import partial
 import os
 
+
 @nb.njit
 def extract_cloud_coordinates(cloudtracknumber_field, cloud_id_in_field, max_size):
     # Define the dictionary with the appropriate types
@@ -32,6 +33,26 @@ def extract_cloud_coordinates(cloudtracknumber_field, cloud_id_in_field, max_siz
     return loc_hash_map_cloud_numbers
     # return loc_hash_map_cloud_numbers
 
+
+class CoordinateTransformer:
+    def __init__(self, target_shape, agg_fact):
+        self.agg_fact = agg_fact
+        self.target_shape=target_shape
+
+    def transform(self, lat_ind, lon_ind):
+        transformed_lat_ind = np.empty((len(lat_ind)*self.agg_fact**2), dtype=int)
+        transformed_lon_ind = np.empty((len(lon_ind)*self.agg_fact**2), dtype=int)
+        step = self.agg_fact**2
+        for k in range(step):
+            i=k//self.agg_fact
+            j=k%self.agg_fact
+            transformed_lat_ind[k::step] = lat_ind*self.agg_fact+i
+            transformed_lon_ind[k::step] = lon_ind*self.agg_fact+j
+        mask = (transformed_lat_ind < self.target_shape[0]) & (transformed_lon_ind < self.target_shape[1]) 
+        # print(mask)
+        transformed_lon_ind = transformed_lon_ind[mask]
+        transformed_lat_ind = transformed_lat_ind[mask]
+        return transformed_lat_ind.T, transformed_lon_ind.T
 
 def extract_value(val):
     if isinstance(val, xr.DataArray):
@@ -82,7 +103,7 @@ def save_single_temp_range_results(cloud_arr, pole, min_temp, max_temp, config):
 
     # Ensure output directory exists
     output_dir = os.path.join(
-        config['postprocessing_output_dir'],pole,
+        config['postprocessing_output_dir'], pole,
         config['time_folder_name'],
         f"Agg_{config['agg_fact']:02}_T_{abs(round(min_temp)):02}_{abs(round(max_temp)):02}"
     )
@@ -99,9 +120,12 @@ def save_single_temp_range_results(cloud_arr, pole, min_temp, max_temp, config):
         cloudinfo_df.to_csv(output_dir_csv)
 
 
-def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps, pole: str, config: dict) -> None:
+
+
+def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps: dict, pole: str, config: dict, pix_area=None,  lon=None, lat=None) -> None:
     # loop_start_time=dt.datetime.now()
     min_temp, max_temp = config['min_temp_arr'][temp_ind], config['max_temp_arr'][temp_ind]
+    is_resampled = config["Resample"]
     # Load datasets
     temp_key = f'{abs(round(min_temp))}_{abs(round(max_temp))}'
     print(f"Analyzing {pole} {temp_key}")
@@ -122,10 +146,13 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps, pole: str
     # Load relevant data from datasets into local variables
     n_tracks = trackstats_data.variables['track_duration'].shape[0]
     basetimes = pd.to_datetime(tracknumbers_data['basetimes'])
-    lat = cloudtrack_data['lat']
-    lon = cloudtrack_data['lon']
-    lat_resolution = (lat.max()-lat.min())/len(lat)
-    lon_resolution = (lon.max()-lon.min())/len(lon)
+    if is_resampled:
+        lat = cloudtrack_data['lat']
+        lon = cloudtrack_data['lon']
+        lat_resolution = (lat.max()-lat.min())/len(lat)
+        lon_resolution = (lon.max()-lon.min())/len(lon)
+    else:
+        coord_transformer = CoordinateTransformer(lon.shape[1:],config["agg_fact"])
     trackstats_data.close()
     tracknumbers_data.close()
     cloudtrack_data.close()
@@ -136,7 +163,7 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps, pole: str
     # print(f"Analyzing T: {min_temp} to {max_temp} Agg={config['agg_fact']}")
     for fp_ind in range(len(basetimes)):
         time = basetimes[fp_ind]
-        time_str = time.strftime("%Y%m%d_%H%M%S")
+        # time_str = time.strftime("%Y%m%d_%H%M%S")
         # print(f'{min_temp} to {max_temp} Loading {time_str}')
         cloudtrack_fp = tracking_fps[pole][temp_key]['cloudtracks'][fp_ind]
         cloudtrack_data = xr.load_dataset(cloudtrack_fp)
@@ -161,7 +188,7 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps, pole: str
         for track_number in cloud_id_in_field:
             try:
                 if cloud_arr[track_number-1] is None:
-                    cloud_arr[track_number-1] = Cloud(temp_key)
+                    cloud_arr[track_number-1] = Cloud(temp_key, is_resampled)
             except:
                 print(
                     f"Error: {temp_ind,track_number,len(cloud_arr)}")
@@ -172,13 +199,29 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps, pole: str
                 ind, cord = hash_map_cloud_numbers[track_number]
                 cloud_location_ind = [cord[0, :ind], cord[1, :ind]]
                 if cloud_location_ind[0].size != 0:
-                    avg_lat_ind = int(round(np.mean(cloud_location_ind[0])))
-                    avg_lon_ind = int(round(np.mean(cloud_location_ind[1])))
-                    # TODO:SPEED UP NEXT TWO LINES (set_cloud_values and update_status)
-                    cloud_values = cph_field.values[0,
-                                                    cloud_location_ind[0].T, cloud_location_ind[1].T]
-                    cloud_arr[track_number-1].update_status(
-                        time, cloud_values, extract_value(lat[avg_lat_ind]), extract_value(lon[avg_lon_ind]), lat_resolution.values, lon_resolution.values)
+                    cloud_cph_values = cph_field.values[0,
+                                                        cloud_location_ind[0].T, cloud_location_ind[1].T]
+                    if is_resampled:
+                        avg_lat_ind = int(
+                            round(np.mean(cloud_location_ind[0])))
+                        avg_lon_ind = int(
+                            round(np.mean(cloud_location_ind[1])))
+                        # TODO:SPEED UP NEXT TWO LINES (set_cloud_values and update_status)
+                        cloud_arr[track_number-1].update_status(
+                            time, cloud_cph_values, extract_value(lat[avg_lat_ind]), extract_value(lon[avg_lon_ind]), pixel_area=lat_resolution.values*lon_resolution.values)
+                    else:
+                        cloud_location_ind_non_agg = coord_transformer.transform(
+                            cloud_location_ind[0], cloud_location_ind[1])
+                        cloud_cph_values = cph_field.values[0,
+                                                            cloud_location_ind[0].T, cloud_location_ind[1].T]
+                        cloud_pix_area_values = pix_area.values[0,
+                                                                cloud_location_ind_non_agg[0], cloud_location_ind_non_agg[1]]
+                        cloud_lat_values = lat.values[0,
+                                                      cloud_location_ind_non_agg[0], cloud_location_ind_non_agg[1]]
+                        cloud_lon_values = lon.values[0,
+                                                      cloud_location_ind_non_agg[0], cloud_location_ind_non_agg[1]]
+                        cloud_arr[track_number-1].update_status(
+                            time, cloud_cph_values, cloud_lat_values, cloud_lon_values, cloud_pix_area_values)
                 else:
                     cloud_arr[track_number-1].update_missing_cloud()
     save_single_temp_range_results(cloud_arr, pole, min_temp, max_temp, config)
@@ -186,11 +229,24 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps, pole: str
 
 def analize_single_pole(pole, cloud_dict, tracking_fps, config, n_procs=1):
     print(f"Analyzing {pole}")
-    with NestablePool(n_procs) as pool:
-        part_single_temp_range = partial(
-            analize_single_temp_range, cloud_dict=cloud_dict, tracking_fps=tracking_fps, pole=pole, config=config)
-        pool.map(part_single_temp_range, range(len(config['min_temp_arr'])))
-        pool.close()
+    aux_ds = xr.load_dataset(config["aux_fps_eu"][pole],decode_times=False)
+    if config["Resample"]:
+        with NestablePool(n_procs) as pool:
+            part_single_temp_range = partial(
+                analize_single_temp_range, cloud_dict=cloud_dict, tracking_fps=tracking_fps, pole=pole, config=config)
+            pool.map(part_single_temp_range, range(
+                len(config['min_temp_arr'])))
+            pool.close()
+    if not config["Resample"]:
+        lat_mat = aux_ds["lat"].load()
+        lon_mat = aux_ds["lon"].load()
+        pix_area = aux_ds["pixel_area"].load()
+        with NestablePool(n_procs) as pool:
+            part_single_temp_range = partial(
+                analize_single_temp_range, cloud_dict=cloud_dict, tracking_fps=tracking_fps, pole=pole, config=config, pix_area=pix_area, lon=lon_mat, lat=lat_mat)
+            pool.map(part_single_temp_range, range(
+                len(config['min_temp_arr'])))
+            pool.close()
 
 
 def save_results(res_dict, config):
@@ -268,7 +324,6 @@ def save_results(res_dict, config):
             if config['write_csv']:
                 output_dir_csv = output_dir + ".csv"
                 cloudinfo_df.to_csv(output_dir_csv)
-
 
 if __name__ == "__main__":
     config = read_config()

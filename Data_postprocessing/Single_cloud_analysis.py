@@ -7,8 +7,9 @@ import datetime as dt
 class Cloud:
     # def __new__(self, *args, **kwargs):
     #     return super().__new__(self)
-    def __init__(self, cloud_id):
+    def __init__(self, cloud_id, is_resampled):
         self.id = cloud_id
+        self.is_resampled = is_resampled
         self.crit_fraction = 0.1
         # Bools inidicating if the cloud has been liquid at any point
         self.is_liq: bool = False
@@ -58,9 +59,12 @@ class Cloud:
 
     def __str__(self):
         return f"{self.is_liq},{self.is_mix},{self.is_ice},"
-
-    def update_status(self, time: dt.datetime, cloud_values: np.array, cloud_lat, cloud_lon, lat_resolution, lon_resolution):
+    #In resampled clouds pixel area should be the area in degrees lon_resolution*lat_resolution
+    def update_status(self, time: dt.datetime, cloud_values: np.array, cloud_lat, cloud_lon ,pixel_area):
         cloud_size_px = cloud_values.shape[0]
+        if not self.is_resampled:
+            cloud_lat = np.average(cloud_lat,weights=pixel_area)
+            cloud_lon = np.average(cloud_lon,weights=pixel_area)
         # print(cloud_values)
         if cloud_size_px:
             self.n_timesteps_no_cloud = 0
@@ -88,9 +92,11 @@ class Cloud:
                 self.is_mix = True
             else:
                 self.is_ice = True
-
-            cloud_size_km = lat_resolution*lon_resolution*cloud_size_px * \
-                np.cos(np.deg2rad(cloud_lat))*111.321*111.111
+            if self.is_resampled:
+                cloud_size_km = pixel_area*cloud_size_px * \
+                    np.cos(np.deg2rad(cloud_lat))*111.321*111.111
+            else:
+                cloud_size_km = pixel_area.sum()
             self.cloud_size_km_list.append(cloud_size_km)
             self.max_size_km = max(self.max_size_km, cloud_size_km)
             self.min_size_km = min(self.min_size_km, cloud_size_km)
