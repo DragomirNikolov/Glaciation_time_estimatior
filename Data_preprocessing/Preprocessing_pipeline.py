@@ -4,11 +4,12 @@ import numpy as np
 import subprocess
 import time
 import threading
+# Doesn't fail glaciosly like the multiprocessing version but is easier to use than refactoring the code for a non-nestable one
 from Glaciation_time_estimator.Auxiliary_func.Nestable_multiprocessing import NestablePool
+from multiprocessing import Pool
 from Glaciation_time_estimator.Auxiliary_func.config_reader import read_config
 from functools import partial
 from Glaciation_time_estimator.Data_preprocessing.Resample_data import ProjectionTransformer
-from Glaciation_time_estimator.Data_preprocessing.Temp_filter import TempFilter
 from Glaciation_time_estimator.Data_preprocessing.File_name_generator import generate_filename_dict
 from Glaciation_time_estimator.Data_preprocessing.Output_file_generation import OutputNonResampledFile, OutputResampledFile
 
@@ -179,6 +180,7 @@ def generate_filtered_output_fps(day_fp, agg_fact, min_temp, max_temp):
 
 
 def filtering_worker(day_fp_to_filter, temp_bounds, agg_fact):
+    print("day_fp_to_filter: ", len(day_fp_to_filter))
     combined_ds = xr.open_mfdataset(
         list(day_fp_to_filter), parallel=True)
     for temp_ind in range(len(temp_bounds[0])):
@@ -193,7 +195,10 @@ def filtering_worker(day_fp_to_filter, temp_bounds, agg_fact):
         _, dataset_list = zip(
             *(combined_ds.groupby("time")))
         # print(len(folder_fps_CTX[folder_fp_ind]))
+        print("output_fps: ", len(output_fps))
+        print("dataset_list: ", len(dataset_list))
         xr.save_mfdataset(dataset_list, list(output_fps))
+    combined_ds.close()
 
 
 def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=8):
@@ -201,7 +206,7 @@ def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=8):
     temp_bounds = generate_temp_range(t_deltas)
     for pole in pole_folders:
         filter_start_time = time.time()
-        pool = NestablePool(n_workers)
+        pool = Pool(n_workers)
         pool.map(partial(filtering_worker, temp_bounds=temp_bounds,
                  agg_fact=agg_fact), fps_by_folder(target_filenames[pole]["filter"]))
         pool.close()
