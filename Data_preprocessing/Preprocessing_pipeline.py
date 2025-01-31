@@ -51,12 +51,21 @@ def fps_by_folder(fp_arr_target):
     return []
 
 
+
 def dispatch(sem, argv, **kw):
     try:
-        subprocess.run(argv, **kw)
+        for args in argv[:-1]:
+            subprocess.run(args, **kw)
+        # for file in argv[-1]:
+        #     os.remove(file)
     finally:
         sem.release()
 
+# cdo -setrtoc2,1,inf,1,0 -setmisstoc,0 -selname,cph_resampled Agg_01_20220205223000.nc out_const.nc
+# cdo -ifnotthen -lec,0 out_median.nc out_mean.nc out_final.nc
+# cdo -b f32 gridboxmean,3,3 -selname,cph_resampled out_corr_miss.nc out_mean.nc
+# cdo -setctomiss,0 -selname,cph_resampled Agg_01_20220205223000.nc out_corr_miss.nc
+# cdo gridboxmedian,3,3 -selname,cph_resampled Agg_01_20220205223000.nc out_median.nc
 
 def aggregation(resample_res_fps, agg_res_fps, agg_fact):
     sem = threading.Semaphore(8)   # pick a threshold here
@@ -64,9 +73,21 @@ def aggregation(resample_res_fps, agg_res_fps, agg_fact):
     Ts = []
     for filename_ind in range(len(resample_res_fps)):
         resample_res_file = resample_res_fps[filename_ind]
+        resample_res_mean = resample_res_file.removesuffix(".nc")+"_mean.nc"
+        resample_res_median = resample_res_file.removesuffix(".nc")+"_median.nc"
+        resample_res_mask = resample_res_file.removesuffix(".nc")+"_mask.nc"
+        resample_res_corr_miss = resample_res_file.removesuffix(".nc")+"_corr_miss.nc"
         agg_res_file = agg_res_fps[filename_ind]
-        argv = ["cdo", f"gridboxmean,{agg_fact},{agg_fact}",
-                "-selname,cph_resampled,ctt_resampled", resample_res_file, agg_res_file]
+        argv = [["cdo", f"setctomiss,0",
+                "-selname,cph_resampled,ctt_resampled", resample_res_file, resample_res_corr_miss],
+                ["cdo","-b","f32" ,f"gridboxmean,{agg_fact},{agg_fact}",
+                "-selname,cph_resampled,ctt_resampled", resample_res_corr_miss, resample_res_mean],
+                ["cdo", "-setrtoc2,1,inf,1,0","-setmisstoc,0",
+                "-selname,cph_resampled", resample_res_file, resample_res_mask],
+                ["cdo", f"gridboxmedian,{agg_fact},{agg_fact}",
+                "-selname,cph_resampled", resample_res_mask, resample_res_median],
+                ["cdo","-ifnotthen","-lec,0",resample_res_median,resample_res_mean,agg_res_file],
+                [resample_res_mean,resample_res_median,resample_res_mask,resample_res_corr_miss]]
         sem.acquire()
         T = threading.Thread(target=dispatch, args=(sem, argv))
         T.start()
@@ -149,6 +170,7 @@ def resample_pole(pole, target_filenames, aux_fps, agg_fact, n_workers):
         pole_pool = NestablePool(n_workers)
         pole_pool.map(par_worker, ind_to_iterate)
         pole_pool.close()
+        pole_pool.join()
     elif n_workers==1:
         for ind in ind_to_iterate:
             par_worker(ind)
@@ -166,6 +188,7 @@ def generate_resampled_output(target_filenames, agg_fact, n_tot_workers=6):
                                      aux_fps=aux_fps, agg_fact=agg_fact, n_workers=int(n_tot_workers/len(pole_folders)))
     pool.map(part_resample_pole_fun, pole_folders)
     pool.close()
+    pool.join()
     end_time = time.time()
     print(f"Total resampling + agg time = {round(end_time-start_time,2)}")
 
@@ -180,24 +203,27 @@ def generate_filtered_output_fps(day_fp, agg_fact, min_temp, max_temp):
 
 
 def filtering_worker(day_fp_to_filter, temp_bounds, agg_fact):
-    print("day_fp_to_filter: ", len(day_fp_to_filter))
+    # print("day_fp_to_filter: ", len(day_fp_to_filter))
     combined_ds = xr.open_mfdataset(
         list(day_fp_to_filter), parallel=True)
     for temp_ind in range(len(temp_bounds[0])):
         min_temp = temp_bounds[0][temp_ind]
         max_temp = temp_bounds[1][temp_ind]
-        mask = (combined_ds['ctt_resampled'] >= 273.15 +
-                min_temp) & (combined_ds['ctt_resampled'] <= 273.15+max_temp)
-        combined_ds['cph_filtered'] = xr.where(
-            mask, combined_ds['cph_resampled'], 0).compute()
+        output_combined_ds = combined_ds.copy()
+        mask = (output_combined_ds['ctt_resampled'] >= 273.15 +
+                min_temp) & (output_combined_ds['ctt_resampled'] <= 273.15+max_temp)
+        output_combined_ds['cph_filtered'] = xr.where(
+            mask, output_combined_ds['cph_resampled'], 0).compute()
+        output_combined_ds = output_combined_ds.drop_vars(["cph_resampled","ctt_resampled"])
         output_fps = generate_filtered_output_fps(
             day_fp_to_filter, agg_fact, min_temp, max_temp)
         _, dataset_list = zip(
-            *(combined_ds.groupby("time")))
+            *(output_combined_ds.groupby("time")))
         # print(len(folder_fps_CTX[folder_fp_ind]))
-        print("output_fps: ", len(output_fps))
-        print("dataset_list: ", len(dataset_list))
+        # print("output_fps: ", len(output_fps))
+        # print("dataset_list: ", len(dataset_list))
         xr.save_mfdataset(dataset_list, list(output_fps))
+        output_combined_ds.close()
     combined_ds.close()
 
 
@@ -210,6 +236,7 @@ def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=8):
         pool.map(partial(filtering_worker, temp_bounds=temp_bounds,
                  agg_fact=agg_fact), fps_by_folder(target_filenames[pole]["filter"]))
         pool.close()
+        pool.join()
         filter_end_time = time.time()
         print(
             f"Filtered {pole} in {round(filter_end_time-filter_start_time,2)}s")

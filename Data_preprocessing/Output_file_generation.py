@@ -83,7 +83,7 @@ class OutputNonResampledFile(OutputFile):
     def __init__(self, cph_dataset, ctx_dataset, agg_fact):
         self.agg_fact = agg_fact
         self.cph_ds= cph_dataset.copy()
-        neded_vars=["cph","ctt","cth"]
+        neded_vars=["cph","ctt","cth","time","x","y"]
         self.cph_ds = self.remove_unwated_var(self.cph_ds,neded_vars)
         self.ctx_ds= ctx_dataset.copy()
         self.ctx_ds = self.remove_unwated_var(self.ctx_ds,neded_vars)

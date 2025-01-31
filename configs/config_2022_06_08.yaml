@@ -17,7 +17,7 @@ job_output_fp: "/cluster/work/climate/dnikolo/Job_output/"
 
 agg_fact: 3
 
-t_deltas: [5]
+t_deltas: [3,5]
 
 postprocessing_fast_mode: False
 fast_mode_arr_size: 20000

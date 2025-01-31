@@ -1,6 +1,6 @@
 start_time: "20220101_0000"
-end_time: "20220301_0000"
-Resample: True
+end_time: "20220101_0100"
+Resample: False
 pole_split: True
 struct_boundary_date: "20210101_0000"
 pole_folders: ["np", "sp"]
@@ -17,7 +17,7 @@ job_output_fp: "/cluster/work/climate/dnikolo/Job_output/"
 
 agg_fact: 3
 
-t_deltas: [5]
+t_deltas: [3]
 
 postprocessing_fast_mode: False
 fast_mode_arr_size: 20000
