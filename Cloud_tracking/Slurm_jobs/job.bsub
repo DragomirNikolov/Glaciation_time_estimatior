@@ -51,7 +51,7 @@ module load stack/2024-06 gcc/12.2.0 openmpi/4.1.6 nco ffmpeg/6.0 #python/3.11.6
 source "${ENV_BIN_DIR}"/activate
 cd $GTE_DIR/../ || exit
 
-python -m Glaciation_time_estimator.Cloud_tracking.Copy_n2o_files  -t "$min_temp" "$max_temp" -p $pole -cf $GTE_CONFIG_DIR
+python -m Glaciation_time_estimator.Cloud_tracking.Copy_filtered_files  -t "$min_temp" "$max_temp" -p $pole -cf $GTE_CONFIG_DIR
 
 # Generate setup file for the iteration in ${TMPDIR}/T-${MINTEMP}-${MAXTEMP}
 python -m Glaciation_time_estimator.Cloud_tracking.Generate_config -t $min_temp $max_temp -bc "${GTE_DIR}/Cloud_tracking/custom_setup.yml" -cf $GTE_CONFIG_DIR

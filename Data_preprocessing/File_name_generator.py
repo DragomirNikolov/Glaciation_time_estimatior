@@ -27,7 +27,7 @@ def intertwine_iterable(*lists):
 
 
 class MissingFilesSearcher:
-    def __init__(self, config):
+    def __init__(self, config, exclude_existing=True):
         round_increment = 15
         self.start_time = round_time(config['start_time'], round_increment)
         self.end_time = round_time(config['end_time'], round_increment)
@@ -43,7 +43,7 @@ class MissingFilesSearcher:
         self.pole_split = config['pole_split']
         self.pole_folders = config['pole_folders']
         self.agg_fact = config['agg_fact']
-
+        self.exclude_existing=exclude_existing
         # self.boundary_date = datetime(
         #     year=2021, month=1, day=1, hour=0, minute=0, second=0)
         self.boundary_date = config['struct_boundary_date']
@@ -84,9 +84,12 @@ class MissingFilesSearcher:
 
     def are_missing(self, filenames):
         if len(filenames) != 0:
-            vec_isfile = np.vectorize(os.path.isfile)
-            file_exists_bool = vec_isfile(filenames)
-            return np.invert(file_exists_bool)
+            if self.exclude_existing:
+                vec_isfile = np.vectorize(os.path.isfile)
+                file_exists_bool = vec_isfile(filenames)
+                return np.invert(file_exists_bool)
+            else:
+                return np.full(filenames.shape, True)
         else:
             return np.array([], dtype=bool)
 
@@ -230,8 +233,8 @@ def check_existance_of_unpr_files(searcher):
                 print(f"All {pole} {file_array_name} files are present")
 
 
-def generate_filename_dict():
-    searcher = MissingFilesSearcher(read_config())
+def generate_filename_dict(exclude_existing=True):
+    searcher = MissingFilesSearcher(read_config(),exclude_existing=exclude_existing)
     searcher.gen_target_filenames()
     check_existance_of_unpr_files(searcher)
     return searcher.result_dict

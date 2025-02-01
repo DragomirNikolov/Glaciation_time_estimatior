@@ -61,6 +61,7 @@ def dispatch(sem, argv, **kw):
     finally:
         sem.release()
 
+
 # cdo -setrtoc2,1,inf,1,0 -setmisstoc,0 -selname,cph_resampled Agg_01_20220205223000.nc out_const.nc
 # cdo -ifnotthen -lec,0 out_median.nc out_mean.nc out_final.nc
 # cdo -b f32 gridboxmean,3,3 -selname,cph_resampled out_corr_miss.nc out_mean.nc
@@ -240,34 +241,6 @@ def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=8):
         filter_end_time = time.time()
         print(
             f"Filtered {pole} in {round(filter_end_time-filter_start_time,2)}s")
-
-        # print(len(folder_fps_CPP[folder_fp_ind]))dataset(dataset_list, list(output_fps))
-
-
-# def parse_cmd_args():
-#     # Retrieve cmd arguments
-#     parser = argparse.ArgumentParser(
-#         description="Create a custom PyFLEXTRKR config file from terminal."
-#     )
-#     parser.add_argument('-st', "--start_time",
-#                         help="Start time in format YYYYMMDDHHMM", default="202301160000")
-#     parser.add_argument('-et', "--end_time",
-#                         help="End time in format YYYYMMDDHHMM", default="202301312345")
-#     parser.add_argument('-af', "--aggregation_factor",
-#                         help="Aggregation factor of file in use", type=int, default=3)
-
-#     # parser.add_argument("-wd", "--work_directory", help="Base yaml config file on which to draw upon", required=True)
-#     args = parser.parse_args()
-
-#     # Put arguments in a dictionary
-#     args_dict = {
-#         'agg_fact': args.aggregation_factor,
-#         'start_time':   datetime.strptime(args.start_time, "%Y%m%d%H%M"),
-#         'end_time':   datetime.strptime(args.end_time, "%Y%m%d%H%M")
-#     }
-#     assert args_dict["start_time"] < args_dict["end_time"], (
-#         "End time shoule be after start time ")
-#     return args_dict
 
 
 if __name__ == "__main__":
