@@ -51,7 +51,6 @@ def fps_by_folder(fp_arr_target):
     return []
 
 
-
 def dispatch(sem, argv, **kw):
     try:
         for args in argv[:-1]:
@@ -75,20 +74,23 @@ def aggregation(resample_res_fps, agg_res_fps, agg_fact):
     for filename_ind in range(len(resample_res_fps)):
         resample_res_file = resample_res_fps[filename_ind]
         resample_res_mean = resample_res_file.removesuffix(".nc")+"_mean.nc"
-        resample_res_median = resample_res_file.removesuffix(".nc")+"_median.nc"
+        resample_res_median = resample_res_file.removesuffix(
+            ".nc")+"_median.nc"
         resample_res_mask = resample_res_file.removesuffix(".nc")+"_mask.nc"
-        resample_res_corr_miss = resample_res_file.removesuffix(".nc")+"_corr_miss.nc"
+        resample_res_corr_miss = resample_res_file.removesuffix(
+            ".nc")+"_corr_miss.nc"
         agg_res_file = agg_res_fps[filename_ind]
         argv = [["cdo", f"setctomiss,0",
                 "-selname,cph_resampled,ctt_resampled", resample_res_file, resample_res_corr_miss],
-                ["cdo","-b","f32" ,f"gridboxmean,{agg_fact},{agg_fact}",
+                ["cdo", "-b", "f32", f"gridboxmean,{agg_fact},{agg_fact}",
                 "-selname,cph_resampled,ctt_resampled", resample_res_corr_miss, resample_res_mean],
-                ["cdo", "-setrtoc2,1,inf,1,0","-setmisstoc,0",
+                ["cdo", "-setrtoc2,1,inf,1,0", "-setmisstoc,0",
                 "-selname,cph_resampled", resample_res_file, resample_res_mask],
                 ["cdo", f"gridboxmedian,{agg_fact},{agg_fact}",
                 "-selname,cph_resampled", resample_res_mask, resample_res_median],
-                ["cdo","-ifnotthen","-lec,0",resample_res_median,resample_res_mean,agg_res_file],
-                [resample_res_mean,resample_res_median,resample_res_mask,resample_res_corr_miss]]
+                ["cdo", "-ifnotthen", "-lec,0", resample_res_median,
+                    resample_res_mean, agg_res_file],
+                [resample_res_mean, resample_res_median, resample_res_mask, resample_res_corr_miss]]
         sem.acquire()
         T = threading.Thread(target=dispatch, args=(sem, argv))
         T.start()
@@ -107,24 +109,25 @@ def resampling_worker(folder_fp_ind, aux_data, agg_fact, folder_fps_CTX, folder_
         list(folder_fps_CPP[folder_fp_ind]), parallel=True, chunks={"time": len(folder_fps_CPP[folder_fp_ind]), "x": aux_data.sizes["x"], "y": aux_data.sizes["y"]})
     input_ctx_ds = xr.open_mfdataset(
         list(folder_fps_CTX[folder_fp_ind]), parallel=True, chunks={"time": len(folder_fps_CTX[folder_fp_ind]), "x": aux_data.sizes["x"], "y": aux_data.sizes["y"]})
- 
+
     if do_resampling:
         output_file = OutputResampledFile(
             input_cpp_ds, agg_fact=1)
     else:
         output_file = OutputNonResampledFile(
-            input_cpp_ds,input_ctx_ds, agg_fact=1)
-    #Add coordinate variables to the output file
+            input_cpp_ds, input_ctx_ds, agg_fact=1)
+    # Add coordinate variables to the output file
     output_file.add_coords(transformer.new_cord_lat,
                            transformer.new_cord_lon)
-    
+
     # Resample cpx dataset contents
     if do_resampling:
         resampled_ctt_data = transformer.remap_data(
             input_ctx_ds["ctt"])
         resampled_cth_data = transformer.remap_data(
             input_ctx_ds["cth"])
-        output_file.set_ctx_output_variables(resampled_ctt_data,resampled_cth_data)
+        output_file.set_ctx_output_variables(
+            resampled_ctt_data, resampled_cth_data)
     else:
         output_file.set_ctx_output_variables()
     # del resampled_ctt_data, resampled_cth_data
@@ -165,24 +168,24 @@ def resample_pole(pole, target_filenames, aux_fps, agg_fact, n_workers):
     folder_agg_res_fps = fps_by_folder(
         target_filenames[pole]["agg_res"])
     par_worker = partial(resampling_worker, aux_data=aux_data, agg_fact=agg_fact, folder_fps_CTX=folder_fps_CTX, folder_fps_CPP=folder_fps_CPP,
-                            folder_resample_res_fps=folder_resample_res_fps, folder_agg_res_fps=folder_agg_res_fps, transformer=transformer)
+                         folder_resample_res_fps=folder_resample_res_fps, folder_agg_res_fps=folder_agg_res_fps, transformer=transformer)
     ind_to_iterate = range(len(folder_fps_CTX))
-    if n_workers>1:
+    if n_workers > 1:
         pole_pool = NestablePool(n_workers)
         pole_pool.map(par_worker, ind_to_iterate)
         pole_pool.close()
         pole_pool.join()
-    elif n_workers==1:
+    elif n_workers == 1:
         for ind in ind_to_iterate:
             par_worker(ind)
-    
+
     aux_data.close()
 
 
 def generate_resampled_output(target_filenames, config, n_tot_workers=6):
     pole_folders = config['pole_folders']
     aux_fps = config['aux_fps']
-    agg_fact=config['agg_fact']
+    agg_fact = config['agg_fact']
     start_time = time.time()
     pool = NestablePool(len(pole_folders))
     part_resample_pole_fun = partial(resample_pole, target_filenames=target_filenames,
@@ -215,7 +218,8 @@ def filtering_worker(day_fp_to_filter, temp_bounds, agg_fact):
                 min_temp) & (combined_ds['ctt_resampled'] <= 273.15+max_temp)
         output_combined_ds['cph_filtered'] = xr.where(
             mask, combined_ds['cph_resampled'], 0).compute()
-        output_combined_ds = output_combined_ds.drop_vars(["cph_resampled","ctt_resampled"])
+        output_combined_ds = output_combined_ds.drop_vars(
+            ["cph_resampled", "ctt_resampled"])
         output_fps = generate_filtered_output_fps(
             day_fp_to_filter, agg_fact, min_temp, max_temp)
         _, dataset_list = zip(
@@ -227,6 +231,28 @@ def filtering_worker(day_fp_to_filter, temp_bounds, agg_fact):
         output_combined_ds.close()
     combined_ds.close()
 
+# cdo -setmisstoc,0 -expr,"cph_filtered = cph_resampled*(ctt_resampled<253.15 && ctt_resampled>243.15)" Agg_03_20220101221500.nc test.nc
+
+def filtering_worker_cdo(day_fp_to_filter, temp_bounds, agg_fact):
+    sem = threading.Semaphore(4)   # pick a threshold here
+    for temp_ind in range(len(temp_bounds[0])):
+        min_temp = temp_bounds[0][temp_ind]
+        max_temp = temp_bounds[1][temp_ind]
+        outpur_fps = generate_filtered_output_fps(
+                day_fp_to_filter, agg_fact, min_temp, max_temp)
+        Ts = []
+        for file_ind, output_fp in enumerate(outpur_fps):
+            sem.acquire()
+            argv=[["cdo","-setmisstoc,0", f'-expr,cph_filtered = cph_resampled*(ctt_resampled<{(273.15+max_temp):0.2f} && ctt_resampled>{(273.15+min_temp):0.2f})', day_fp_to_filter[file_ind], output_fp],
+                   []
+                  ]
+            T = threading.Thread(target=dispatch, args=(sem, argv))
+            T.start()
+            Ts.append(T)
+        for T in Ts:
+            T.join()
+    return
+
 
 def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=8):
     pole_folders = ["np", "sp"]
@@ -234,7 +260,7 @@ def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=8):
     for pole in pole_folders:
         filter_start_time = time.time()
         pool = Pool(n_workers)
-        pool.map(partial(filtering_worker, temp_bounds=temp_bounds,
+        pool.map(partial(filtering_worker_cdo, temp_bounds=temp_bounds,
                  agg_fact=agg_fact), fps_by_folder(target_filenames[pole]["filter"]))
         pool.close()
         pool.join()
@@ -245,7 +271,7 @@ def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=8):
 
 if __name__ == "__main__":
     print("Generating target filenames")
-    
+
     config = read_config()
     t_deltas = config["t_deltas"]
     # config = parse_cmd_args()

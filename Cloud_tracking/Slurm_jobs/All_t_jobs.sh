@@ -1,6 +1,6 @@
 #!/bin/bash
 agg_fact=3
-dt=5
+dt=3
 for min_temp in $(seq $dt $dt 38); do
     # max = min - dt because we deal with absolutes of negative numbers
     max_temp=$((min_temp - dt))
