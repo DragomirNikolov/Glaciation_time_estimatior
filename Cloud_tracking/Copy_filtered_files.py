@@ -35,7 +35,7 @@ def parse_cmd_args():
 
 
 def generate_remote_fps(config,cmd_args):
-    target_dict = generate_filename_dict()
+    target_dict =  generate_filename_dict(exclude_existing=False)
     target_fps = np.char.replace(
         target_dict[cmd_args["pole"]]["filter"],
         f"Agg_{config['agg_fact']:02}_",

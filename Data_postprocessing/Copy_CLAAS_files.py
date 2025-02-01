@@ -24,8 +24,9 @@ if __name__ == "__main__":
         target_folders =np.unique(vec_dirname(target_fps))
         data_dir= os.path.join(tmp_dir, "Data",pole, "")
         os.makedirs(data_dir, exist_ok=True)
-        print(data_dir)
         print(target_folders)
+        print(data_dir)
+        print(config["postprocessing_output_dir"], config["CLAAS_fp"])
         for folder in target_folders:
             subprocess.run(["rsync", "-auq", f"{os.path.join(folder,'')}", data_dir ])
 

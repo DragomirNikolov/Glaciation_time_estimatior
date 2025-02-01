@@ -13,7 +13,7 @@ aux_fps:
   
 #Leave empy if no name
 CLAAS_fp: "n2o:/wolke_scratch/dnikolo/CLAAS_Data/"
-job_output_fp: "/cluster/work/climate/dnikolo/Job_output/"
+job_output_fp: "eu:/cluster/work/climate/dnikolo/Job_output/"
 
 agg_fact: 3
 

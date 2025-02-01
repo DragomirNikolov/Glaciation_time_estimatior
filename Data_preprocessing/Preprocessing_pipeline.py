@@ -179,10 +179,10 @@ def resample_pole(pole, target_filenames, aux_fps, agg_fact, n_workers):
     aux_data.close()
 
 
-def generate_resampled_output(target_filenames, agg_fact, n_tot_workers=6):
-    pole_folders = ["np", "sp"]
-    aux_fps = {"np": "/wolke_scratch/dnikolo/CLAAS_Data/np/CM_SAF_CLAAS3_L2_AUX.nc",
-               "sp": "/wolke_scratch/dnikolo/CLAAS_Data/sp/CM_SAF_CLAAS3_L2_AUX.nc"}
+def generate_resampled_output(target_filenames, config, n_tot_workers=6):
+    pole_folders = config['pole_folders']
+    aux_fps = config['aux_fps']
+    agg_fact=config['agg_fact']
     start_time = time.time()
     pool = NestablePool(len(pole_folders))
     part_resample_pole_fun = partial(resample_pole, target_filenames=target_filenames,
@@ -246,17 +246,17 @@ def generate_filtered_files(target_filenames, t_deltas, agg_fact, n_workers=8):
 if __name__ == "__main__":
     print("Generating target filenames")
     
-    args_dict = read_config()
-    t_deltas = args_dict["t_deltas"]
-    # args_dict = parse_cmd_args()
-    print(args_dict['start_time'],
-          args_dict['end_time'], args_dict['agg_fact'])
+    config = read_config()
+    t_deltas = config["t_deltas"]
+    # config = parse_cmd_args()
+    print(config['start_time'],
+          config['end_time'], config['agg_fact'])
     target_filenames = generate_filename_dict()
     # print(target_filenames)
     print("Target filenames generated")
     print("Resampling needed files")
-    generate_resampled_output(target_filenames, agg_fact=args_dict['agg_fact'])
+    generate_resampled_output(target_filenames, config)
     print("Needed files resampled. Start filtering")
     generate_filtered_files(target_filenames, t_deltas,
-                            agg_fact=args_dict['agg_fact'])
+                            agg_fact=config['agg_fact'])
     print("Filtering complete")
