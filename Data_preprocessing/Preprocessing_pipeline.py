@@ -56,8 +56,8 @@ def dispatch(sem, argv, **kw):
     try:
         for args in argv[:-1]:
             subprocess.run(args, **kw)
-        # for file in argv[-1]:
-        #     os.remove(file)
+        for file in argv[-1]:
+            os.remove(file)
     finally:
         sem.release()
 
@@ -210,10 +210,10 @@ def filtering_worker(day_fp_to_filter, temp_bounds, agg_fact):
         min_temp = temp_bounds[0][temp_ind]
         max_temp = temp_bounds[1][temp_ind]
         output_combined_ds = combined_ds.copy()
-        mask = (output_combined_ds['ctt_resampled'] >= 273.15 +
-                min_temp) & (output_combined_ds['ctt_resampled'] <= 273.15+max_temp)
+        mask = (combined_ds['ctt_resampled'] >= 273.15 +
+                min_temp) & (combined_ds['ctt_resampled'] <= 273.15+max_temp)
         output_combined_ds['cph_filtered'] = xr.where(
-            mask, output_combined_ds['cph_resampled'], 0).compute()
+            mask, combined_ds['cph_resampled'], 0).compute()
         output_combined_ds = output_combined_ds.drop_vars(["cph_resampled","ctt_resampled"])
         output_fps = generate_filtered_output_fps(
             day_fp_to_filter, agg_fact, min_temp, max_temp)
