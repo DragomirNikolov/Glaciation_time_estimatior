@@ -11,6 +11,11 @@ aux_fps:
     "sp": "/wolke_scratch/dnikolo/CLAAS_Data/sp/CM_SAF_CLAAS3_L2_AUX.nc",
   }
   
+aux_fps_eu:
+  {
+    "np": "/cluster/work/climate/dnikolo/Auxiliary_files/CM_SAF_CLAAS3_L2_AUX_NP.nc",
+    "sp": "/cluster/work/climate/dnikolo/Auxiliary_files/CM_SAF_CLAAS3_L2_AUX_NP.nc",
+  }  
 #Leave empy if no name
 CLAAS_fp: "n2o:/wolke_scratch/dnikolo/CLAAS_Data/"
 job_output_fp: "eu:/cluster/work/climate/dnikolo/Job_output/"
