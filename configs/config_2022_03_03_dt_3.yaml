@@ -28,5 +28,5 @@ postprocessing_fast_mode: False
 fast_mode_arr_size: 20000
 write_csv: True
 #Folder for postprocessing
-postprocessing_output_dir: /cluster/work/climate/dnikolo/Cloud_analysis/
+postprocessing_output_dir: eu:/cluster/work/climate/dnikolo/Cloud_analysis/
 time_folder_format: "%Y%m%d.%H%M"
