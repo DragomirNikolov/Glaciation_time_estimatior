@@ -131,9 +131,12 @@ def get_combined_cloud_df(config):
                 folder_name,
                 f"Agg_{agg_fact:02}_T_{abs(round(min_temp)):02}_{abs(round(max_temp)):02}.parquet"
             )
-
-            # Read the parquet file into a dataframe
-            df = pd.read_parquet(fp)
+            try:
+                # Read the parquet file into a dataframe
+                df = pd.read_parquet(fp)
+            except:
+                print(f"Couldn't load {fp}.\nSkipping ({pole}, {min_temp} to {max_temp})")
+                continue
 
             # Add columns for min_temp, max_temp, and pole
             df['min_temp'] = min_temp

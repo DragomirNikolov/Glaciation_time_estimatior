@@ -43,7 +43,9 @@ def check_keys(config):
         "fast_mode_arr_size",
         "write_csv",
         "postprocessing_output_dir",
-        "time_folder_format"
+        "time_folder_format",
+        "collect_additional_properties",
+        'Global_sqrt_mse'
     ]
     config_keys_set = set(config.keys())
     expected_keys_set = set(keys_to_check)
