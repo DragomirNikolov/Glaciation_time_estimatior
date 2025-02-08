@@ -3,6 +3,10 @@ import xarray as xr
 import datetime as dt
 
 
+import numpy as np
+import xarray as xr
+import datetime as dt
+
 
 class Cloud:
     # def __new__(self, *args, **kwargs):
@@ -26,7 +30,6 @@ class Cloud:
         self.end_ice_fraction_arr = np.empty(4)
         # self.ice_fraction_arr=np.empty(max_timesteps)
         self.ice_fraction_list = []
-        
 
         self.max_water_fraction: float = 0.0
         self.max_ice_fraction: float = 0.0
@@ -40,43 +43,74 @@ class Cloud:
 
         self.n_timesteps = None
 
-        self.sum_cloud_cot=0
+        self.sum_cloud_cot = 0
         self.avg_cot = None
-        self.cot_timestep_counter=0
+        self.cot_timestep_counter = 0
         self.mean_cot_list = []
         self.std_cot_list = []
-        
+
+        self.sum_cloud_ctp = 0
+        self.avg_ctp = None
+        self.ctp_timestep_counter = 0
+        self.mean_ctp_list = []
+        self.std_ctp_list = []
+
+        self.sum_cloud_cwp = 0
+        self.avg_cwp = None
+        self.cwp_timestep_counter = 0
+        self.mean_cwp_list = []
+        self.std_cwp_list = []
 
         self.sum_cloud_lat = 0.0
         self.sum_cloud_lon = 0.0
         self.avg_cloud_lat = None
         self.avg_cloud_lon = None
-        self.lon_list=[]
-        self.lat_list=[]
+        self.lon_list = []
+        self.lat_list = []
 
         self.sum_cloud_size_km = 0.0
         self.avg_cloud_size_km = None
         self.cloud_size_km_list = []
-        self.large_pixel_cloud=False
+        self.large_pixel_cloud = False
 
         self.sum_cloud_size_px = 0.0
         self.avg_cloud_size_px = None
 
-        
         self.valid_cot_cloud = False
-        self.cot_nan_frac_list=[]
+        self.cot_nan_frac_list = []
+
+        self.valid_ctp_cloud = False
+        self.ctp_nan_frac_list = []
 
         self.n_timesteps_no_cloud = 0
         self.terminate_cloud = False
 
     def __str__(self):
         return f"{self.is_liq},{self.is_mix},{self.is_ice},"
-    #In resampled clouds pixel area should be the area in degrees lon_resolution*lat_resolution
-    def update_status(self, time: dt.datetime, cloud_values: np.array, cot_values, cloud_lat, cloud_lon ,pixel_area):
+    # In resampled clouds pixel area should be the area in degrees lon_resolution*lat_resolution
+
+    def update_status(self, time: dt.datetime, cloud_values: np.array, cot_values, ctp_values, cloud_lat, cloud_lon, pixel_area):
+        ind_to_take = ~np.isnan(pixel_area)
+        pixel_area = pixel_area[ind_to_take]
+        if sum(pixel_area) == 0:
+            print(
+                f"Cloud_properties:\nID:{self.id}\nTime:{time}\nMax_size_km = {self.max_size_km}\n Valid_cot_cloud:{self.valid_cot_cloud}\nValid_ctp_cloud:{self.valid_ctp_cloud}\n")
+            print("Pixel_area:", pixel_area)
+            print("Ind to take:", ind_to_take)
+            print("Cloud_values:", cloud_values)
+            print("Cot_values:", cot_values)
+            print("Ctp_values:", ctp_values)
+            print("Cloud_lat:", cloud_lat)
+            print("Cloud_lon:", cloud_lon)
+            raise ValueError("All pixel areas are zero")
+        cot_values = cot_values[ind_to_take]
+        ctp_values = ctp_values[ind_to_take]
+        cloud_lat = cloud_lat[ind_to_take]
+        cloud_lon = cloud_lon[ind_to_take]
         cloud_size_px = cloud_values.shape[0]
         if not self.is_resampled:
-            cloud_lat = np.average(cloud_lat,weights=pixel_area)
-            cloud_lon = np.average(cloud_lon,weights=pixel_area)
+            cloud_lat = np.average(cloud_lat, weights=pixel_area)
+            cloud_lon = np.average(cloud_lon, weights=pixel_area)
             # cloud_lat = 10
             # cloud_lon = 10
         # print(cloud_values)
@@ -92,7 +126,7 @@ class Cloud:
             # assert math.isclose(water_fraction+ice_fraction,1)
             # print(water_fraction)
             # print(water_fraction)f cloud_arr[track_number-1] is None:
-            
+
             if not (self.track_start_time):
                 self.track_start_time = time
                 self.n_timesteps = 1
@@ -112,8 +146,9 @@ class Cloud:
                     np.cos(np.deg2rad(cloud_lat))*111.321*111.111
             else:
                 cloud_size_km = pixel_area.sum()
-                large_pixel_frac = np.count_nonzero(pixel_area>66)/pixel_area.shape[0]
-                if large_pixel_frac>0.1 or pixel_area.max()>110:
+                large_pixel_frac = np.count_nonzero(
+                    pixel_area > 66)/pixel_area.shape[0]
+                if large_pixel_frac > 0.1 or pixel_area.max() > 110:
                     self.large_pixel_cloud = True
             self.cloud_size_km_list.append(cloud_size_km)
             self.max_size_km = max(self.max_size_km, cloud_size_km)
@@ -151,21 +186,45 @@ class Cloud:
             # self.ice_fraction_arr[n_timesteps]=ice_fraction
             self.ice_fraction_list.append(ice_fraction)
 
-            cot_nan_frac = np.count_nonzero(np.isnan(cot_values))/cot_values.shape[0]
-            if cot_nan_frac>0.1:
-                self.valid_cot_cloud=False
-            self.cot_nan_frac_list.append(cot_nan_frac)
-            weights = pixel_area[~np.isnan(cot_values)]
-            if len(weights)>0:
-                cot_values = cot_values[~np.isnan(cot_values)]
-                mean_cot = np.average(cot_values,weights=weights)
-                if cot_nan_frac<0.1:
-                    self.sum_cloud_cot+=mean_cot
-                    self.cot_timestep_counter+=1
-                    self.avg_cot=self.sum_cloud_cot/self.cot_timestep_counter
-            else:
-                mean_cot = np.nan
-            self.mean_cot_list.append(mean_cot)
+            self.update_cot_variables(cot_values, pixel_area)
+            self.update_ctp_variables(ctp_values, pixel_area)
+
+    def update_cot_variables(self, cot_values, pixel_area):
+        cot_nan_frac = np.count_nonzero(
+            np.isnan(cot_values))/cot_values.shape[0]
+        if cot_nan_frac > 0.1:
+            self.valid_cot_cloud = False
+        self.cot_nan_frac_list.append(cot_nan_frac)
+        weights = pixel_area[~np.isnan(cot_values)]
+        if len(weights) > 0:
+            cot_values = cot_values[~np.isnan(cot_values)]
+            mean_cot = np.average(cot_values, weights=weights)
+            if cot_nan_frac < 0.1:
+                self.sum_cloud_cot += mean_cot
+                self.cot_timestep_counter += 1
+                self.avg_cot = self.sum_cloud_cot/self.cot_timestep_counter
+        else:
+            mean_cot = np.nan
+        self.mean_cot_list.append(mean_cot)
+
+    def update_ctp_variables(self, ctp_values, pixel_area):
+        ctp_nan_frac = np.count_nonzero(
+            np.isnan(ctp_values))/ctp_values.shape[0]
+        if ctp_nan_frac > 0.1:
+            self.valid_ctp_cloud = False
+        self.ctp_nan_frac_list.append(ctp_nan_frac)
+        weights = pixel_area[~np.isnan(ctp_values)]
+        if len(weights) > 0:
+            ctp_values = ctp_values[~np.isnan(ctp_values)]
+            mean_ctp = np.average(ctp_values, weights=weights)
+            if ctp_nan_frac < 0.1:
+                self.sum_cloud_ctp += mean_ctp
+                self.ctp_timestep_counter += 1
+                self.avg_ctp = self.sum_cloud_ctp/self.ctp_timestep_counter
+        else:
+            mean_ctp = np.nan
+        self.mean_ctp_list.append(mean_ctp)
+
     def update_missing_cloud(self):
         if self.track_end_time and (not self.terminate_cloud):
             self.n_timesteps_no_cloud += 1

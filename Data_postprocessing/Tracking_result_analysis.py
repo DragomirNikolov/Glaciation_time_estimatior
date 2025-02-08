@@ -6,7 +6,7 @@ from datetime import datetime
 from Glaciation_time_estimator.Auxiliary_func.config_reader import read_config
 from Glaciation_time_estimator.Data_postprocessing.Single_cloud_analysis import Cloud
 from Glaciation_time_estimator.Data_postprocessing.Job_result_fp_generator import generate_tracking_filenames
-from multiprocessing import Manager
+from multiprocessing import Manager, Pool
 from Glaciation_time_estimator.Auxiliary_func.Nestable_multiprocessing import NestablePool
 from functools import partial
 import os
@@ -64,11 +64,15 @@ def extract_value(val):
     return val
 
 
-def extract_cot(time, pole):
+def extract_cpp_vars(time, pole):
     cpp_filename = time.strftime("CPPin%Y%m%d%H%M%S405SVMSGI1MD.nc")
-    cpp_data = xr.load_dataset(os.path.join(
-        os.environ["TMPDIR"], "Data", pole, cpp_filename))
-    return cpp_data['cot']
+    with xr.load_dataset(os.path.join(os.environ["TMPDIR"], "Data", pole, cpp_filename)) as cpp_data:
+        return cpp_data['cot'],cpp_data['cwp']
+
+def extract_ctx_vars(time, pole):
+    ctx_filename = time.strftime("CTXin%Y%m%d%H%M%S405SVMSGI1MD.nc")
+    with xr.load_dataset(os.path.join(os.environ["TMPDIR"], "Data", pole, ctx_filename)) as ctx_data:
+        return ctx_data['ctp']
     # print(f'{min_temp} to {max_temp} Loading {time_str}')
 # /cluster/work/climate/dnikolo/dump/Data/np/CPPin20210101000000405SVMSGI1MD.nc
 
@@ -80,13 +84,13 @@ def extract_cloud_number_field(cloudtrack_data):
 
 
 def save_single_temp_range_results(cloud_arr, pole, min_temp, max_temp, config):
-    columns = ["is_large_pix_cloud", "is_cot_valid_cloud", "is_liq", "is_mix", "is_ice", "max_water_frac",
+    columns = ["is_large_pix_cloud", "is_cot_valid_cloud","is_ctp_valid_cloud", "is_liq", "is_mix", "is_ice", "max_water_frac",
                "max_ice_fraction", "avg_size[km]", "max_size[km]",
                "min_size[km]", "avg_size[px]", "max_size[px]",
-               "min_size[px]", "track_start_time", "track_length", "avg_cot",
+               "min_size[px]", "track_start_time", "track_length", "avg_cot","avg_ctp",
                "glaciation_start_time", "glaciation_end_time", "avg_lat",
                "avg_lon", "start_ice_fraction", "end_ice_fraction",
-               "ice_frac_hist", "cot_hist", "cot_nan_frac_hist", "lat_hist", "lon_hist",
+               "ice_frac_hist", "cot_hist", "cot_nan_frac_hist","ctp_hist", "ctp_nan_frac_hist", "lat_hist", "lon_hist",
                "size_hist_km"]
     datapoints_per_cloud = len(columns)
     cloudinfo_df = pd.DataFrame(
@@ -97,6 +101,7 @@ def save_single_temp_range_results(cloud_arr, pole, min_temp, max_temp, config):
             cloudinfo_df.iloc[cloud_ind] = [
                 current_cloud.large_pixel_cloud,
                 current_cloud.valid_cot_cloud,
+                current_cloud.valid_ctp_cloud,
                 current_cloud.is_liq,
                 current_cloud.is_mix,
                 current_cloud.is_ice,
@@ -111,6 +116,7 @@ def save_single_temp_range_results(cloud_arr, pole, min_temp, max_temp, config):
                 current_cloud.track_start_time,
                 current_cloud.track_length,
                 current_cloud.avg_cot,
+                current_cloud.avg_ctp,
                 current_cloud.glaciation_start_time,
                 current_cloud.glaciation_end_time,
                 extract_value(current_cloud.avg_cloud_lat),
@@ -120,6 +126,8 @@ def save_single_temp_range_results(cloud_arr, pole, min_temp, max_temp, config):
                 current_cloud.ice_fraction_list,
                 current_cloud.mean_cot_list,
                 current_cloud.cot_nan_frac_list,
+                current_cloud.mean_ctp_list,
+                current_cloud.ctp_nan_frac_list,
                 current_cloud.lat_list,
                 current_cloud.lon_list,
                 current_cloud.cloud_size_km_list
@@ -163,8 +171,8 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps: dict, pol
             tracking_fps[pole][temp_key]["trackstats_final"])
         tracknumbers_data = xr.load_dataset(
             tracking_fps[pole][temp_key]["tracknumbers"])
-    except:  # Exception as inst:
-        print(f"Skipping {pole} {min_temp} to {max_temp}")
+    except Exception as e:
+        print(f"Skipping {pole} {min_temp} to {max_temp} due to error: {e}")
         cloud_dict[temp_key] = np.array([])
         return None
     # Load relevant data from datasets into local variables
@@ -191,7 +199,8 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps: dict, pol
         time_str = time.strftime("%Y%m%d_%H%M%S")
         # print(f'{min_temp} to {max_temp} Loading {time_str}')
         if collect_cot:
-            cot_field = extract_cot(time, pole)
+            cot_field,cwp_field = extract_cpp_vars(time, pole)
+            ctp_field  = extract_ctx_vars(time, pole)
         cloudtrack_fp = tracking_fps[pole][temp_key]['cloudtracks'][fp_ind]
         cloudtrack_data = xr.load_dataset(cloudtrack_fp)
         cloudtracknumber_field = extract_cloud_number_field(cloudtrack_data)
@@ -200,6 +209,7 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps: dict, pol
             cloudtracknumber_field, return_counts=True)
         counts = counts[cloud_id_in_field != 0]
         if len(counts) == 0:
+            print(f"{pole} - {min_temp} to {max_temp}: No cloud timestep: {time_str}")
             continue
         cloud_id_in_field = cloud_id_in_field[cloud_id_in_field != 0]
         max_allowed_cloud_size_px = config['fast_mode_arr_size'] if config['postprocessing_fast_mode'] else counts.max(
@@ -211,6 +221,7 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps: dict, pol
             print(np.where(counts, counts == counts.max()))
         # print(cloud_id_in_field)
         for track_number in cloud_id_in_field:
+
             try:
                 if cloud_arr[track_number-1] is None:
                     cloud_arr[track_number-1] = Cloud(temp_key, is_resampled)
@@ -248,21 +259,25 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps: dict, pol
                         if collect_cot:
                             cloud_cot_values = cot_field.values[0,
                                                                 cloud_location_ind_non_agg[0], cloud_location_ind_non_agg[1]]
+                            cloud_ctp_values = ctp_field.values[0,
+                                                                cloud_location_ind_non_agg[0], cloud_location_ind_non_agg[1]]
                         else:
-                            cloud_cot_values =np.array([0])
+                            cloud_cot_values = np.array([0])
+                            cloud_ctp_values = np.array([0])
                         # print(np.info(cloud_cot_values))
                         cloud_arr[track_number-1].update_status(
-                            time, cloud_cph_values, cloud_cot_values, cloud_lat_values, cloud_lon_values, cloud_pix_area_values)
+                            time, cloud_cph_values, cloud_cot_values, cloud_ctp_values, cloud_lat_values, cloud_lon_values, cloud_pix_area_values)
+                        
                 else:
                     cloud_arr[track_number-1].update_missing_cloud()
     save_single_temp_range_results(cloud_arr, pole, min_temp, max_temp, config)
 
 
-def analize_single_pole(pole, cloud_dict, tracking_fps, config, n_procs=3):
+def analize_single_pole(pole, cloud_dict, tracking_fps, config, n_procs=4):
     print(f"Analyzing {pole}")
     aux_ds = xr.load_dataset(config["aux_fps_eu"][pole], decode_times=False)
     if config["Resample"]:
-        with NestablePool(n_procs) as pool:
+        with Pool(n_procs) as pool:
             part_single_temp_range = partial(
                 analize_single_temp_range, cloud_dict=cloud_dict, tracking_fps=tracking_fps, pole=pole, config=config)
             pool.map(part_single_temp_range, range(
@@ -273,7 +288,7 @@ def analize_single_pole(pole, cloud_dict, tracking_fps, config, n_procs=3):
         lat_mat = aux_ds["lat"].load()
         lon_mat = aux_ds["lon"].load()
         pix_area = aux_ds["pixel_area"].load()
-        with NestablePool(n_procs) as pool:
+        with Pool(n_procs) as pool:
             part_single_temp_range = partial(
                 analize_single_temp_range, cloud_dict=cloud_dict, tracking_fps=tracking_fps, pole=pole, config=config, pix_area=pix_area, lon=lon_mat, lat=lat_mat)
             pool.map(part_single_temp_range, range(
@@ -360,7 +375,6 @@ def save_results(res_dict, config):
                 output_dir_csv = output_dir + ".csv"
                 cloudinfo_df.to_csv(output_dir_csv)
 
-
 def analyse_tracked_clouds(config):
     tracking_fps = generate_tracking_filenames(config)
     with Manager() as manager:
@@ -372,6 +386,8 @@ def analyse_tracked_clouds(config):
             pool.map(part_analize_single_pole, config['pole_folders'])
             pool.close()
             pool.join()
+        # for pole in  config['pole_folders']:
+        #     part_analize_single_pole(pole)
 
 
 if __name__ == "__main__":
