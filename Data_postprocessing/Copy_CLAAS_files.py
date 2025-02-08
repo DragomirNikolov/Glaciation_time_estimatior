@@ -1,4 +1,3 @@
-
 import subprocess
 import sys
 import os
@@ -17,14 +16,18 @@ def copy_files(config):
     vec_dirname = np.vectorize(os.path.dirname)
     for pole in config["pole_folders"]:
         target_fps = generate_remote_fps(pole)
-        target_folders =np.unique(vec_dirname(target_fps))
-        data_dir= os.path.join(tmp_dir, "Data",pole, "")
+        target_folders = np.unique(vec_dirname(target_fps))
+        data_dir = os.path.join(tmp_dir, "Data", pole, "")
         os.makedirs(data_dir, exist_ok=True)
-        print(target_folders)
-        print(data_dir)
-        print(config["postprocessing_output_dir"], config["CLAAS_fp"])
+        print("Target folders:", target_folders)
+        print("Data directory:", data_dir)
+        print("Other config values:", config["postprocessing_output_dir"], config["CLAAS_fp"])
         for folder in target_folders:
-            subprocess.run(["rsync","-v", "-auq", f"{os.path.join(folder,'')}", data_dir ])
+            # The 'check=True' parameter will raise a CalledProcessError if rsync fails.
+            subprocess.run(
+                ["rsync", "-v", "-auq", os.path.join(folder, ""), data_dir],
+                check=True
+            )
 
 if __name__ == "__main__":
     copy_files(read_config())

@@ -14,16 +14,9 @@ def get_cdo_command(nc_file_path):
     else:
         return f"cdo info {nc_file_path}"
 
-def ensure_directory_exists(directory_path):
-    if not os.path.exists(directory_path):
-        os.makedirs(directory_path)
-
 def process_nc_files(target_folder):
     cdo_info_file = os.path.join(target_folder, "cdo_info.txt")
     failed_validation_file = os.path.join(target_folder, "failed_validation.txt")
-    
-    # Ensure directories exist before overwriting files
-    ensure_directory_exists(target_folder)
     
     # Ensure files exist before overwriting
     with open(cdo_info_file, "w") as f:
@@ -53,41 +46,39 @@ def process_nc_files(target_folder):
                 
                 # Check for 'nan' in the Mean column
                 for line in result.stdout.split("\n"):
-                    match = re.search(r'\s+\d+ : [\d-]+ [\d:]+\s+\d+\s+\d+\s+\d+ :\s+([-0-9.e]+|nan)', line)
-                    if match and match.group(1) == "nan":
+                    match = re.search(r'\s+\d+ : [\d-]+ [\d:]+\s+\d+\s+\d+\s+\d+ :\s+([-0-9.e]+|nan|0.0000)', line)
+                    if match and (match.group(1) == "nan" or match.group(1) == "0.0000"):
                         fail_file.write(f"{nc_file_path}\n")
-                        break  # No need to check further if a 'nan' is found
+                        break  # No need to check further if a 'nan' or '0.0000' is found
             
             pbar.update(1)
 
-def combine_failed_validations(base_folder, subfolders):
+def combine_failed_validations(base_folder):
     combined_failed_validation = os.path.join(base_folder, "failed_validation.txt")
-    ensure_directory_exists(base_folder)
     with open(combined_failed_validation, "w") as combined_file:
-        for folder in subfolders:
-            failed_validation_file = os.path.join(folder, "failed_validation.txt")
-            if os.path.exists(failed_validation_file):
-                with open(failed_validation_file, "r") as fail_file:
+        for root, _, files in os.walk(base_folder):
+            if "failed_validation.txt" in files:
+                failed_validation_path = os.path.join(root, "failed_validation.txt")
+                with open(failed_validation_path, "r") as fail_file:
                     combined_file.write(fail_file.read())
 
 def delete_invalid_files(base_folder):
     combined_failed_validation = os.path.join(base_folder, "failed_validation.txt")
-    if not os.path.exists(combined_failed_validation):
-        return
-    
     deleted_count = 0
-    with open(combined_failed_validation, "r") as fail_file:
-        file_paths = fail_file.read().splitlines()
     
-    for file_path in file_paths:
-        if not (file_path.startswith("/wolke_scratch/dnikolo/CLAAS_Data/np") or 
-                file_path.startswith("/wolke_scratch/dnikolo/CLAAS_Data/sp")):
-            try:
-                os.remove(file_path)
-                print(f"Deleted: {file_path}")
-                deleted_count += 1
-            except OSError as e:
-                print(f"Error deleting {file_path}: {e}")
+    if os.path.exists(combined_failed_validation):
+        with open(combined_failed_validation, "r") as fail_file:
+            file_paths = fail_file.read().splitlines()
+        
+        for file_path in file_paths:
+            if not (file_path.startswith("/wolke_scratch/dnikolo/CLAAS_Data/np") or 
+                    file_path.startswith("/wolke_scratch/dnikolo/CLAAS_Data/sp")):
+                try:
+                    os.remove(file_path)
+                    print(f"Deleted: {file_path}")
+                    deleted_count += 1
+                except OSError as e:
+                    print(f"Error deleting {file_path}: {e}")
     
     print(f"Total deleted files: {deleted_count}")
 
@@ -98,14 +89,59 @@ def process_all_subfolders(base_folder):
         for folder in subfolders:
             process_nc_files(folder)
             pbar.update(1)
-    
-    combine_failed_validations(base_folder, subfolders)
+    combine_failed_validations(base_folder)
     #delete_invalid_files(base_folder)
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python script.py <folder_path>")
-        sys.exit(1)
+def process_specific_folders(date_str):
+    base_paths = [
+        f"/wolke_scratch/dnikolo/CLAAS_Data/Filtered_Data/np/{date_str[:4]}/{date_str[5:]}",
+        f"/wolke_scratch/dnikolo/CLAAS_Data/Filtered_Data/sp/{date_str[:4]}/{date_str[5:]}",
+        f"/wolke_scratch/dnikolo/CLAAS_Data/Resampled_Data/np/{date_str[:4]}/{date_str[5:]}",
+        f"/wolke_scratch/dnikolo/CLAAS_Data/Resampled_Data/sp/{date_str[:4]}/{date_str[5:]}"
+    ]
+    # Process each folder and its subfolders
+    for folder in base_paths:
+        if os.path.exists(folder):
+            process_all_subfolders(folder)
+        else:
+            raise FileExistsError(f"Folder doesn't exist: {folder}")
     
-    target_folder = sys.argv[1]
-    process_all_subfolders(target_folder)
+    # ========================
+    # New code starts here
+    # Combine the four failed_validation.txt files into one file in the Validation_results folder.
+    validation_results_dir = "/wolke_scratch/dnikolo/CLAAS_Data/Validation_results"
+    os.makedirs(validation_results_dir, exist_ok=True)
+    # Use the date_str to name the combined file as YYYY_DD_Preproc.txt.
+    # (If your date string is e.g. "2025_02", then the output file will be "2025_02_Preproc.txt")
+    combined_file_name = f"{date_str[:4]}_{date_str[5:]}_Preproc.txt"
+    combined_file_path = os.path.join(validation_results_dir, combined_file_name)
+
+    with open(combined_file_path, "w") as outfile:
+        for folder in base_paths:
+            failed_file = os.path.join(folder, "failed_validation.txt")
+            if os.path.exists(failed_file):
+                with open(failed_file, "r") as infile:
+                    content = infile.read()
+                    # Optionally, write a header to identify the source folder:
+                    outfile.write(f"### Source: {failed_file} ###\n")
+                    outfile.write(content)
+                    outfile.write("\n")
+    print(f"Combined failed validations saved to {combined_file_path}")
+    # New code ends here
+    # ========================
+
+if __name__ == "__main__":
+    if "--final" in sys.argv:
+        index = sys.argv.index("--final")
+        if index + 1 < len(sys.argv):
+            date_str = sys.argv[index + 1]
+            process_specific_folders(date_str)
+        else:
+            print("Error: Missing date argument for --final")
+            sys.exit(1)
+    elif len(sys.argv) < 2:
+        print("Usage: python script.py <folder_path> or python script.py --final YYYY_MM")
+        sys.exit(1)
+    else:
+        target_folder = sys.argv[1]
+        process_all_subfolders(target_folder)
