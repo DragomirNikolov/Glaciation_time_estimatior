@@ -43,7 +43,7 @@ class MissingFilesSearcher:
         self.pole_split = config['pole_split']
         self.pole_folders = config['pole_folders']
         self.agg_fact = config['agg_fact']
-        self.exclude_existing=exclude_existing
+        self.exclude_existing = exclude_existing
         # self.boundary_date = datetime(
         #     year=2021, month=1, day=1, hour=0, minute=0, second=0)
         self.boundary_date = config['struct_boundary_date']
@@ -202,17 +202,21 @@ class MissingFilesSearcher:
             min_temp = abs(self.min_temp_arr[temp_ind])
             max_temp = abs(self.max_temp_arr[temp_ind])
             cloudtracks_fp_format = os.path.join(
-                job_output_folder, f"Agg_{self.agg_fact:02}_T_{min_temp:02}_{max_temp:02}",folder_name, "pixel_path_tracking",folder_name, filename_format)
-            key=f"{abs(min_temp)}_{abs(max_temp)}"
-            cloudtracks_fps[key]={}
+                job_output_folder, f"Agg_{self.agg_fact:02}_T_{min_temp:02}_{max_temp:02}", folder_name, "pixel_path_tracking", folder_name, filename_format)
+            key = f"{abs(min_temp)}_{abs(max_temp)}"
+            cloudtracks_fps[key] = {}
             cloudtracks_fps[key]["cloudtracks"] = np.array(
                 self.gen_filename_list(file_format=cloudtracks_fp_format))
             stats_fp_format = os.path.join(
-                job_output_folder, f"Agg_{self.agg_fact:02}_T_{min_temp:02}_{max_temp:02}",folder_name, "stats")
-            cloudtracks_fps[key]["trackstats"] = os.path.join(stats_fp_format,f"trackstats_{folder_name}.nc")
-            cloudtracks_fps[key]["tracknumbers"] = os.path.join(stats_fp_format,f"tracknumbers_{folder_name}.nc")
-            cloudtracks_fps[key]["trackstats_final"] = os.path.join(stats_fp_format,f"trackstats_final_{folder_name}.nc")
-            cloudtracks_fps[key]["trackstats_sparce"] = os.path.join(stats_fp_format,f"trackstats_sparce_{folder_name}.nc")
+                job_output_folder, f"Agg_{self.agg_fact:02}_T_{min_temp:02}_{max_temp:02}", folder_name, "stats")
+            cloudtracks_fps[key]["trackstats"] = os.path.join(
+                stats_fp_format, f"trackstats_{folder_name}.nc")
+            cloudtracks_fps[key]["tracknumbers"] = os.path.join(
+                stats_fp_format, f"tracknumbers_{folder_name}.nc")
+            cloudtracks_fps[key]["trackstats_final"] = os.path.join(
+                stats_fp_format, f"trackstats_final_{folder_name}.nc")
+            cloudtracks_fps[key]["trackstats_sparce"] = os.path.join(
+                stats_fp_format, f"trackstats_sparce_{folder_name}.nc")
         return cloudtracks_fps
 
 
@@ -224,28 +228,30 @@ def check_existance_of_unpr_files(searcher):
             missing_ind = searcher.are_missing(filenames)
             if missing_ind is not None:
                 if (missing_ind).any():
-                    print(f"There are missing {pole} {file_array_name} files")
                     missing_files = filenames[missing_ind]
-                    print(missing_files[0])
-                    print(len(filenames))
-                    print(len(missing_files))
+                    raise FileExistsError(
+                        f"There are missing {pole} {file_array_name} files \n {missing_files[0]} \n len(filenames): {len(filenames)} \n len(missing_filenames): {len(missing_files)}")
             else:
                 print(f"All {pole} {file_array_name} files are present")
 
 
 def generate_filename_dict(exclude_existing=True):
-    searcher = MissingFilesSearcher(read_config(),exclude_existing=exclude_existing)
+    searcher = MissingFilesSearcher(
+        read_config(), exclude_existing=exclude_existing)
     searcher.gen_target_filenames()
-    check_existance_of_unpr_files(searcher)
+    if exclude_existing:
+        check_existance_of_unpr_files(searcher)
     return searcher.result_dict
 
 
 if __name__ == "__main__":
     print("Start")
-    start_time = datetime(2020, 1, 1, 0, 0)
-    end_time = datetime(2021, 11, 29, 23, 59)
-    t_deltas = [3, 5]
-    searcher = MissingFilesSearcher(start_time, end_time, t_deltas)
-    searcher.gen_target_filenames()
-    check_existance_of_unpr_files(searcher)
+    # start_time = datetime(2020, 1, 1, 0, 0)
+    # end_time = datetime(2021, 11, 29, 23, 59)
+    # t_deltas = [3, 5]
+    # searcher = MissingFilesSearcher(start_time, end_time, t_deltas)
+    # searcher.gen_target_filenames()
+    # check_existance_of_unpr_files(searcher)
+    result_dict = generate_filename_dict()
+    print(result_dict['filter'])
     print("Done")

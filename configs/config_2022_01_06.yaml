@@ -1,5 +1,5 @@
-start_time: "20220301_0000"
-end_time: "20220401_0000"
+start_time: "20220101_0000"
+end_time: "20220701_0000"
 Resample: False
 pole_split: True
 struct_boundary_date: "20210101_0000"
@@ -22,11 +22,15 @@ job_output_fp: "eu:/cluster/work/climate/dnikolo/Job_output/"
 
 agg_fact: 3
 
-t_deltas: [9,6,5,3]
+t_deltas: [6,3]
 
 postprocessing_fast_mode: False
 fast_mode_arr_size: 20000
 write_csv: True
 #Folder for postprocessing
 postprocessing_output_dir: eu:/cluster/work/climate/dnikolo/Cloud_analysis/
+collect_additional_properties: True
 time_folder_format: "%Y%m%d.%H%M"
+
+Global_sqrt_mse: 0.05628526744657018
+
