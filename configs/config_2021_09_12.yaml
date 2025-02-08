@@ -1,5 +1,5 @@
-start_time: "20220901_0000"
-end_time: "20221231_2345"
+start_time: "20210901_0000"
+end_time: "20211231_2345"
 Resample: False
 pole_split: True
 struct_boundary_date: "20210101_0000"
@@ -22,7 +22,7 @@ job_output_fp: "eu:/cluster/work/climate/dnikolo/Job_output/"
 
 agg_fact: 3
 
-t_deltas: [6,3]
+t_deltas: [6]
 
 postprocessing_fast_mode: False
 fast_mode_arr_size: 20000
