@@ -1,5 +1,5 @@
 start_time: "20220101_0000"
-end_time: "20220115_0000"
+end_time: "20220101_0200"
 Resample: False
 pole_split: True
 struct_boundary_date: "20210101_0000"

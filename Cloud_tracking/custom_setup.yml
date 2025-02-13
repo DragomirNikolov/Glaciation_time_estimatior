@@ -2,7 +2,7 @@
 # Arctic mixed phase stratus tracking configuration file
 #STILL NOT SET UP
 # 0 - Warnings , 1 - Info , 2 - Debug
-debug_mode: 1
+debug_mode: 0
 logger_filepath: '/cluster/work/climate/dnikolo/n2o/Glaciation_time_estimatior/Debug/Logging/Log_standard.log'
 error_filepath: '/cluster/work/climate/dnikolo/n2o/Glaciation_time_estimatior/Debug/Errors/Error_standard.log'
 

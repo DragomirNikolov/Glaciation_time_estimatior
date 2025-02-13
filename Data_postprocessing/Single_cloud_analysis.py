@@ -92,17 +92,23 @@ class Cloud:
     def update_status(self, time: dt.datetime, cloud_values: np.array, cot_values, ctp_values, cloud_lat, cloud_lon, pixel_area):
         ind_to_take = ~np.isnan(pixel_area)
         pixel_area = pixel_area[ind_to_take]
-        if sum(pixel_area) == 0:
-            print(
-                f"Cloud_properties:\nID:{self.id}\nTime:{time}\nMax_size_km = {self.max_size_km}\n Valid_cot_cloud:{self.valid_cot_cloud}\nValid_ctp_cloud:{self.valid_ctp_cloud}\n")
-            print("Pixel_area:", pixel_area)
-            print("Ind to take:", ind_to_take)
-            print("Cloud_values:", cloud_values)
-            print("Cot_values:", cot_values)
-            print("Ctp_values:", ctp_values)
-            print("Cloud_lat:", cloud_lat)
-            print("Cloud_lon:", cloud_lon)
-            raise ValueError("All pixel areas are zero")
+        if sum(pixel_area) == 0 or len(pixel_area)==0:
+            error_message = f"""All pixel areas are zero or pixel area size is 0:\n
+            Cloud_properties:
+            ID: {self.id}\n
+            Time: {time}\n
+            Max_size_km: {self.max_size_km}\n
+            Valid_cot_cloud: {self.valid_cot_cloud}\n
+            Valid_ctp_cloud: {self.valid_ctp_cloud}\n
+            Pixel_area: {pixel_area}\n
+            Ind to take: {ind_to_take}\n
+            Cloud_values: {cloud_values}\n
+            Cot_values: {cot_values}\n
+            Ctp_values: {ctp_values}\n
+            Cloud_lat: {cloud_lat}\n
+            Cloud_lon: {cloud_lon}
+            """
+            raise ValueError(error_message)
         cot_values = cot_values[ind_to_take]
         ctp_values = ctp_values[ind_to_take]
         cloud_lat = cloud_lat[ind_to_take]
