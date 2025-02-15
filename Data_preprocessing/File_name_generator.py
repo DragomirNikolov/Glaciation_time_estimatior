@@ -38,7 +38,7 @@ class MissingFilesSearcher:
         self.min_temp_arr = config['min_temp_arr']
         self.max_temp_arr = config['max_temp_arr']
         # CLAAS_FP shouldnt contain the CPP
-        self.CLAAS_FP = config['CLAAS_fp'].strip(f"{os.uname()[1]}:")
+        self.CLAAS_FP = config['CLAAS_fp'].replace(f"{os.uname()[1]}:","")
         # print(CLAAS_FP)
         self.pole_split = config['pole_split']
         self.pole_folders = config['pole_folders']

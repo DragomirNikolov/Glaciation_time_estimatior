@@ -30,49 +30,37 @@ def generate_remote_fps(config, cmd_args):
         f"Agg_{config['agg_fact']:02}_",
         f"Agg_{config['agg_fact']:02}_T_{abs(cmd_args['temp_bounds'][0]):02}_{abs(cmd_args['temp_bounds'][1]):02}_"
     )
+    # print(target_dict[cmd_args["pole"]]["filter"])
+    # print(config["CLAAS_fp"])
+    # print(target_fps)
+
+    target_fps = np.char.replace(target_fps, config["CLAAS_fp"],"")
     return np.char.replace(target_fps, "Resampled_Data", "Filtered_Data")
 
 if __name__ == "__main__":
     config = read_config()
     target_fps = generate_remote_fps(config, parse_cmd_args())
 
-    # Remote host specification.
-    remote_host = "user@remote"  # Change this to your actual remote host (and username if needed).
-
     # Create the local destination directory.
     tmp_dir = os.environ["TMPDIR"]
     data_dir = os.path.join(tmp_dir, "Data")
     os.makedirs(data_dir, exist_ok=True)
-    print(f"Copying needed files from {remote_host} to {data_dir}")
-
-    # Process file list:
-    # The generated paths might already include the remote host prefix.
-    # Remove the remote host (and the colon) so that paths are absolute on the remote host.
-    files_to_copy = []
-    for fp in target_fps:
-        fp = str(fp)
-        prefix = f"{remote_host}:"
-        if fp.startswith(prefix):
-            fp = fp[len(prefix):]
-        files_to_copy.append(fp)
-
-    if not files_to_copy:
-        print("No files to copy.")
-        sys.exit(0)
+    print(f"Copying needed files from {config['CLAAS_fp']} to {data_dir}")
 
     # Write the file list to a temporary file.
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
         tmp_filename = f.name
-        for path in files_to_copy:
+        for path in target_fps:
             f.write(path + "\n")
+            # print(path)s
 
     # Use rsync's --files-from option.
     # The source directory is set to "/" so that the file paths in the list (which are absolute)
     # are interpreted correctly on the remote machine.
     cmd = [
-        "rsync", "-auq",
+        "rsync", "-auq","--no-relative",
         f"--files-from={tmp_filename}",
-        f"{remote_host}:/",  # Source: remote host's root directory.
+        config["CLAAS_fp"],  # Source: remote host's root directory.
         data_dir           # Destination: local data_dir.
     ]
     print("Running rsync with --files-from")
