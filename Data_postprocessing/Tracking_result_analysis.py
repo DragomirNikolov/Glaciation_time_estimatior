@@ -64,13 +64,19 @@ def extract_value(val):
     return val
 
 
-def extract_cpp_vars(time, pole):
-    cpp_filename = time.strftime("CPPin%Y%m%d%H%M%S405SVMSGI1MD.nc")
+def extract_cpp_vars(time, pole, config):
+    if time>config["struct_boundary_date"]:
+        cpp_filename = time.strftime("CPPin%Y%m%d%H%M%S405SVMSGI1MD.nc")
+    else:
+        cpp_filename = time.strftime("CPPin%Y%m%d%H%M%S405SVMSG01MD.nc")
     with xr.load_dataset(os.path.join(os.environ["TMPDIR"], "Data", pole, cpp_filename)) as cpp_data:
         return cpp_data['cot'],cpp_data['cwp']
 
-def extract_ctx_vars(time, pole):
-    ctx_filename = time.strftime("CTXin%Y%m%d%H%M%S405SVMSGI1MD.nc")
+def extract_ctx_vars(time, pole, config):
+    if time>config["struct_boundary_date"]:
+        ctx_filename = time.strftime("CTXin%Y%m%d%H%M%S405SVMSGI1MD.nc")
+    else:
+        ctx_filename = time.strftime("CTXin%Y%m%d%H%M%S405SVMSG01MD.nc")
     with xr.load_dataset(os.path.join(os.environ["TMPDIR"], "Data", pole, ctx_filename)) as ctx_data:
         return ctx_data['ctp']
     # print(f'{min_temp} to {max_temp} Loading {time_str}')
@@ -157,6 +163,7 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps: dict, pol
     min_temp, max_temp = config['min_temp_arr'][temp_ind], config['max_temp_arr'][temp_ind]
     is_resampled = config["Resample"]
     collect_cot = config["collect_additional_properties"]
+    
     # Load datasets
     temp_key = f'{abs(round(min_temp))}_{abs(round(max_temp))}'
     print(f"Analyzing {pole} {temp_key}")
@@ -199,10 +206,14 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps: dict, pol
     for fp_ind in range(len(basetimes)):
         time = basetimes[fp_ind]
         time_str = time.strftime("%Y%m%d_%H%M%S")
+        if time>config["struct_boundary_date"]:
+            aux_ind = 1
+        else:
+            aux_ind = 0
         # print(f'{min_temp} to {max_temp} Loading {time_str}')
         if collect_cot:
-            cot_field,cwp_field = extract_cpp_vars(time, pole)
-            ctp_field  = extract_ctx_vars(time, pole)
+            cot_field,cwp_field = extract_cpp_vars(time, pole, config)
+            ctp_field  = extract_ctx_vars(time, pole, config)
         cloudtrack_fp = tracking_fps[pole][temp_key]['cloudtracks'][fp_ind]
         cloudtrack_data = xr.load_dataset(cloudtrack_fp)
         cloudtracknumber_field = extract_cloud_number_field(cloudtrack_data)
@@ -252,11 +263,11 @@ def analize_single_temp_range(temp_ind: int, cloud_dict, tracking_fps: dict, pol
                             cloud_location_ind[0], cloud_location_ind[1])
                         cloud_cph_values = cph_field.values[0,
                                                             cloud_location_ind[0].T, cloud_location_ind[1].T]
-                        cloud_pix_area_values = pix_area.values[0,
+                        cloud_pix_area_values = pix_area.values[aux_ind,
                                                                 cloud_location_ind_non_agg[0], cloud_location_ind_non_agg[1]]
-                        cloud_lat_values = lat.values[0,
+                        cloud_lat_values = lat.values[aux_ind,
                                                       cloud_location_ind_non_agg[0], cloud_location_ind_non_agg[1]]
-                        cloud_lon_values = lon.values[0,
+                        cloud_lon_values = lon.values[aux_ind,
                                                       cloud_location_ind_non_agg[0], cloud_location_ind_non_agg[1]]
                         if collect_cot:
                             cloud_cot_values = cot_field.values[0,
