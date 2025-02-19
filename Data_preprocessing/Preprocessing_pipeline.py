@@ -133,7 +133,7 @@ def resampling_worker(folder_fp_ind, aux_data, agg_fact, folder_fps_CTX, folder_
     else:
         output_file.set_ctx_output_variables()
     # del resampled_ctt_data, resampled_cth_data
-    # input_ctx_ds.close()
+    input_ctx_ds.close()
 
     # Resample cpp dataset contents
     if do_resampling:

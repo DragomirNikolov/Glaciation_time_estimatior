@@ -155,7 +155,7 @@ class OutputNonResampledFile(OutputFile):
         os.makedirs(os.path.dirname(output_fps[0]), exist_ok=True)
         _, dataset_list = zip(*(self.cph_ds.groupby("time")))
         if len(dataset_list) != len(output_fps):
-            raise ValueError(f"Mismatch between dimentons of dataset_list({len(dataset_list)}) and output_list({len(output_fps)}).\n Dataset listt: {dataset_list} Output list:{output_fps}")
+            raise ValueError(f"Mismatch between dimentons of dataset_list({len(dataset_list)}) and output_list({len(output_fps)}).\n Dataset list: {dataset_list} Output list:{output_fps}")
         xr.save_mfdataset(dataset_list, list(output_fps))
         self.cph_ds.close()
         self.ctx_ds.close()

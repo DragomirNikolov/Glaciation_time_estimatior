@@ -1,5 +1,5 @@
-start_time: "20190501_0000"
-end_time: "20190901_0000"
+start_time: "20220101_0000"
+end_time: "20220103_0000"
 Resample: False
 pole_split: True
 struct_boundary_date: "20210101_0000"
@@ -14,7 +14,7 @@ aux_fps:
 aux_fps_eu:
   {
     "np": "/cluster/work/climate/dnikolo/Auxiliary_files/CM_SAF_CLAAS3_L2_AUX_NP.nc",
-    "sp": "/cluster/work/climate/dnikolo/Auxiliary_files/CM_SAF_CLAAS3_L2_AUX_SP.nc",
+    "sp": "/cluster/work/climate/dnikolo/Auxiliary_files/CM_SAF_CLAAS3_L2_AUX_NP.nc",
   }  
 #Leave empy if no name
 CLAAS_fp: "n2o:/wolke_scratch/dnikolo/CLAAS_Data/"
@@ -22,7 +22,7 @@ job_output_fp: "eu:/cluster/work/climate/dnikolo/Job_output/"
 
 agg_fact: 3
 
-t_deltas: [6]
+t_deltas: [15,12,9,6,3]
 
 postprocessing_fast_mode: False
 fast_mode_arr_size: 20000
@@ -30,10 +30,7 @@ write_csv: True
 
 #Folder for postprocessing
 postprocessing_output_dir: eu:/cluster/work/climate/dnikolo/Cloud_analysis/
-# Defined as every analisis done outside cloud top phase and cloud top temperature
-# Defined as 
 collect_additional_properties: True
 time_folder_format: "%Y%m%d.%H%M"
 
 Global_sqrt_mse: 0.05628526744657018
-
