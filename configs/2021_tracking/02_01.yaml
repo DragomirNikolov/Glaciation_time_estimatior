@@ -1,5 +1,5 @@
-start_time: "20200115_0000"
-end_time: "20200201_0000"
+start_time: "20210201_0000"
+end_time: "20210215_0000"
 Resample: False
 pole_split: True
 struct_boundary_date: "20210101_0000"
@@ -30,8 +30,6 @@ write_csv: True
 
 #Folder for postprocessing
 postprocessing_output_dir: eu:/cluster/work/climate/dnikolo/Cloud_analysis/
-# Defined as every analisis done outside cloud top phase and cloud top temperature
-# Defined as 
 collect_additional_properties: True
 time_folder_format: "%Y%m%d.%H%M"
 

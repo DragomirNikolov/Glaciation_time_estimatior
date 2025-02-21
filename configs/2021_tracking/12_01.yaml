@@ -1,5 +1,5 @@
-start_time: "20210801_0000"
-end_time: "20210901_0000"
+start_time: "20211201_0000"
+end_time: "20211215_0000"
 Resample: False
 pole_split: True
 struct_boundary_date: "20210101_0000"
@@ -14,7 +14,7 @@ aux_fps:
 aux_fps_eu:
   {
     "np": "/cluster/work/climate/dnikolo/Auxiliary_files/CM_SAF_CLAAS3_L2_AUX_NP.nc",
-    "sp": "/cluster/work/climate/dnikolo/Auxiliary_files/CM_SAF_CLAAS3_L2_AUX_NP.nc",
+    "sp": "/cluster/work/climate/dnikolo/Auxiliary_files/CM_SAF_CLAAS3_L2_AUX_SP.nc",
   }  
 #Leave empy if no name
 CLAAS_fp: "n2o:/wolke_scratch/dnikolo/CLAAS_Data/"
