@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 import sys
 from Glaciation_time_estimator.Data_postprocessing.Job_result_fp_generator import generate_tracking_filenames
 from Glaciation_time_estimator.Auxiliary_func.config_reader import read_config
-
+from derivative import dxdt
+from scipy.integrate import cumulative_trapezoid
 
 def Extract_array_from_df(series: pd.Series):
     if series.empty:
@@ -79,6 +80,42 @@ class Glaciation:
         self.max_ind = max_ind
         self.magnitude = self.max - self.min
         self.time = (max_ind - min_ind)*timestep
+        self.timestep=timestep
+    def estimate_glac_time(self,data ,max_rmse_diff=2 ):
+        glac_timesteps=self.max_ind- self.min_ind
+        if glac_timesteps ==1:
+            self.linear=True
+            time=self.timestep
+            self.rate_arr=np.array([(self.max-self.min)/self.timestep*60])
+            self.line_rmse=0
+        else:
+            #Calculate mean suqared error relative to a line between the two points
+            linear_growth_line = np.linspace(data[self.min_ind],data[self.max_ind], num =glac_timesteps+1 )
+            rmse = np.sqrt((np.square(linear_growth_line - data[self.min_ind:self.max_ind+1])).mean())
+            self.line_rmse=rmse
+            if rmse>max_rmse_diff*global_rmse:
+                self.linear=False
+                #This divide by 3 is the magic number that makes all the noise robust derivatives work
+                magical_factor=3
+                t=np.arange(len(data))/magical_factor
+                #TODO: Correct min and max ind to min and max in filtered data
+                dIFdt = dxdt(data, t, kind="trend_filtered", order=0, alpha=1e-2)
+                trend_filtered_curve = data[0] + cumulative_trapezoid(dIFdt, t, initial=0)
+                # self.find_nearest_peak(trend_filtered_curve)
+                #Correct so that total delta is equal to measured magnitude
+                dIFdt_glac = dIFdt[self.min_ind:self.max_ind+1]
+                dIFdt_glac *= self.magnitude/(cumulative_trapezoid(dIFdt_glac, t[self.min_ind:self.max_ind+1], initial=0)[-1])
+
+                #Factor *4/3 added: 4 to convert to hours  and 3 to correct for the factor added above
+                dIFdt_glac *= 60/self.timestep/magical_factor
+                #Not sure about min rate to take
+                self.rate_arr=dIFdt_glac[dIFdt_glac>1e-2]
+                # print(f"rmse = {rmse:03f}: Non-linear")
+            else:
+                # print(f"rmse = {rmse:03f}: Linear")
+                self.linear=True
+                self.rate_arr=np.full(glac_timesteps , (self.max-self.min)/(glac_timesteps*self.timestep)*60)
+        self.avg_rate = self.rate_arr.mean()
 
 
 def select_peaks(data, filt, significant_peak_tresh=0.2, glac_tresh=0.4):
@@ -103,6 +140,7 @@ def select_peaks(data, filt, significant_peak_tresh=0.2, glac_tresh=0.4):
                 if filt_data[peak.born] - local_min >= glac_tresh:
                     glac_list.append(Glaciation(
                         prev_peak.born + local_min_ind, peak.born, filt_data))
+                    glac_list[-1].estimate_glac_time(filt_data)
                     # print("a")
                 prev_peak = peak
     return glac_list
@@ -165,9 +203,9 @@ def gen_glac_df(result_df, combined_cloud_df):
     for i, row in result_df.iterrows():
         for glaciation in row['glac_list']:
             # glaciation.
-            glaciations_list.append([i, glaciation.time, glaciation.magnitude])
+            glaciations_list.append([i, glaciation.time, glaciation.magnitude, glaciation.min_ind , glaciation.max_ind, glaciation.linear, glaciation.line_rmse, glaciation.rate_arr,glaciation.rate_arr.mean() ])
     glaciations_df = pd.DataFrame(glaciations_list, columns=[
-        "Cloud_ID", "Time [m]", "Magnitude"])
+        "Cloud_ID", "Time [m]", "Magnitude", "Glac_start_ind", "Glac_peak_ind", "Linear", "line_rmse", "Rate_arr", "Mean_glac_rate"])
     glaciations_df["Glaciation time [h]"] = glaciations_df["Time [m]"]/60
     return pd.merge(glaciations_df, combined_cloud_df, how="left",
                     left_on="Cloud_ID", right_index=True, validate="m:1")
@@ -201,4 +239,6 @@ def extract_glaciations(config):
 
 if __name__ == "__main__":
     config = read_config()
+    global global_rmse
+    global_rmse = config["Global_sqrt_mse"]
     extract_glaciations(config)
